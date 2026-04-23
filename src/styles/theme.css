@@ -1,0 +1,360 @@
+/* ============================================================
+   Graffiti Studio — 다크 테마
+   UI 목업(C:\AI\NEW_TOOL_UI_mockup.html)과 동일한 디자인 토큰.
+   ============================================================ */
+
+:root {
+  --bg-0: #0b0d12;
+  --bg-1: #121521;
+  --bg-2: #1a1f2e;
+  --bg-3: #252b3d;
+  --border: #2a3247;
+
+  --text-1: #e7ebf5;
+  --text-2: #9aa3b8;
+  --text-3: #5f677d;
+
+  --accent-purple: #8b5cf6;
+  --accent-purple-dim: #7c3aed;
+  --accent-mint: #34d399;
+  --accent-teal: #22d3ee;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  min-height: 100vh;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", "Pretendard", system-ui, sans-serif;
+  background: var(--bg-0);
+  color: var(--text-1);
+  line-height: 1.5;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: var(--accent-teal);
+  text-decoration: none;
+}
+
+/* ---------- 공통 레이아웃 ---------- */
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  min-height: 100vh;
+  background: var(--bg-0);
+  overflow: hidden;
+}
+
+.top-nav {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.brand-tag {
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--bg-3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.app-body {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ---------- 사이드바 ---------- */
+
+.side {
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  padding: 12px 8px 80px;
+  position: relative;
+  overflow-y: auto;
+}
+
+.side-section {
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 12px 8px 4px;
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 1px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: none;
+  transition: all 0.12s;
+}
+
+.side-item:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.side-item.active {
+  background: var(--accent-purple);
+  color: white;
+  font-weight: 600;
+}
+
+.side-item .ico {
+  font-size: 13px;
+  width: 16px;
+  text-align: center;
+}
+
+.side-item .count {
+  margin-left: auto;
+  font-size: 9px;
+  background: var(--bg-3);
+  color: var(--text-2);
+  padding: 1px 5px;
+  border-radius: 8px;
+}
+
+.side-item.active .count {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.side-mode-panel {
+  position: absolute;
+  bottom: 10px;
+  left: 8px;
+  right: 8px;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 3px;
+  background: var(--bg-2);
+  padding: 3px;
+  border-radius: 6px;
+  width: 100%;
+}
+
+.mode-toggle button {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--text-2);
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  transition: all 0.12s;
+}
+
+.mode-toggle button.active {
+  background: var(--accent-purple);
+  color: white;
+}
+
+/* ---------- 메인 컨텐츠 ---------- */
+
+.content {
+  padding: 16px 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 편집 페이지 공용 — 남은 세로 공간을 꽉 채움 */
+.edit-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.edit-page > *:not(.edit-grid) {
+  flex: 0 0 auto;
+}
+
+.edit-grid {
+  display: grid;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.edit-viewport-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  gap: 6px;
+}
+
+.edit-viewport-col > *:not(.edit-viewport) {
+  flex: 0 0 auto;
+}
+
+.edit-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+
+.edit-viewport > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.edit-side {
+  overflow-y: auto;
+  padding-right: 4px;
+  min-height: 0;
+}
+
+.screen-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.screen-title h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ---------- 버튼 ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-3);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.btn:hover { background: var(--bg-2); }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-dim));
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+
+.btn-primary:hover { filter: brightness(1.1); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-2);
+}
+
+.btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+/* ---------- 카드/placeholder ---------- */
+
+.placeholder {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.placeholder .ico {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+
+.placeholder h2 {
+  color: var(--text-2);
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.note {
+  background: rgba(139, 92, 246, 0.1);
+  border-left: 3px solid var(--accent-purple);
+  padding: 10px 14px;
+  border-radius: 5px;
+  color: var(--text-1);
+  font-size: 12px;
+  margin: 12px 0;
+}
+
+.note.mint { background: rgba(52, 211, 153, 0.08); border-left-color: var(--accent-mint); }
+.note.warn { background: rgba(245, 158, 11, 0.08); border-left-color: var(--warn); }
+
+/* ---------- 모드 배지 ---------- */
+
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  border: 1px solid;
+}
+
+.mode-badge.integrated {
+  color: var(--accent-mint);
+  border-color: var(--accent-mint);
+}
+
+.mode-badge.standalone {
+  color: var(--warn);
+  border-color: var(--warn);
+}
