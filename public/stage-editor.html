@@ -158,6 +158,101 @@
   .info-row .value { font-family: ui-monospace, monospace; }
 
   small.note { font-size: 10px; color: var(--muted); display: block; line-height: 1.5; }
+
+  /* === Scene context section === */
+  .scene-info {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .scene-info.empty { color: var(--muted); font-style: italic; }
+  .scene-info .scene-title { font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+  .scene-info .scene-meta { color: var(--muted); font-size: 10px; }
+
+  /* === Character & Asset cards === */
+  .char-card, .asset-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .char-card:hover, .asset-card:hover { background: var(--panel-2); border-color: var(--accent); }
+  .char-card.selected { border-color: var(--accent); background: rgba(168, 85, 247, 0.08); }
+  .char-card.in-scene { border-left: 3px solid var(--success); }
+  .char-card .checkbox {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    flex-shrink: 0;
+    font-size: 10px;
+    color: white;
+  }
+  .char-card.selected .checkbox { background: var(--accent); border-color: var(--accent); }
+  .char-card .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .char-card .badges { display: flex; gap: 3px; flex-shrink: 0; }
+  .badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .badge.novel { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: #1e6e8e; }
+  .badge.sheet8 { background: rgba(168, 85, 247, 0.15); color: var(--accent); border-color: #6b3fa0; }
+  .badge.role { background: rgba(245, 200, 66, 0.15); color: #f5c842; border-color: #8e6b1e; }
+
+  /* Asset card variants */
+  .asset-card { padding: 5px 8px; }
+  .asset-card .icon { font-size: 14px; flex-shrink: 0; }
+  .asset-card .toggle {
+    width: 28px; height: 14px;
+    background: var(--panel-2);
+    border-radius: 7px;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .asset-card .toggle::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    background: var(--muted);
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left 0.15s, background 0.15s;
+  }
+  .asset-card.applied .toggle { background: var(--success); }
+  .asset-card.applied .toggle::after { left: 16px; background: white; }
+
+  /* Section subheaders within library */
+  .lib-subheader {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 8px 0 4px;
+    padding-left: 2px;
+  }
+  .lib-empty { font-size: 11px; color: var(--muted); font-style: italic; padding: 8px; text-align: center; }
+
+  /* Action button group */
+  .action-group { display: flex; gap: 4px; margin-bottom: 8px; }
+  .action-group button { flex: 1; padding: 6px 8px; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -170,11 +265,20 @@
 <main>
   <!-- ========== LEFT PANEL ========== -->
   <aside class="panel left">
-    <h2>1. 캐릭터 라이브러리</h2>
-    <div id="char-list"></div>
-    <button id="add-char-btn">+ 캐릭터 추가</button>
+    <h2>1. 씬 데이터</h2>
+    <div class="action-group">
+      <button id="load-sample-btn" class="secondary">📥 샘플 씬</button>
+      <button id="import-json-btn" class="secondary">📂 JSON</button>
+    </div>
+    <div id="scene-info" class="scene-info empty">씬 데이터 없음 — 위 버튼으로 로드</div>
 
-    <div id="add-char-form" class="hidden">
+    <h2>2. 캐릭터 라이브러리</h2>
+    <div id="char-library">
+      <div class="lib-empty">씬을 로드하면 캐릭터가 여기 표시됩니다</div>
+    </div>
+    <button id="add-char-btn" class="secondary" style="margin-top: 6px; font-size: 11px;">+ 수동 추가 (테스트용)</button>
+
+    <div id="add-char-form" class="hidden" style="margin-top: 8px;">
       <div class="field">
         <label class="lbl">이름</label>
         <input type="text" id="char-name" placeholder="예: 여자" />
@@ -200,19 +304,22 @@
       </div>
     </div>
 
-    <h2>2. 배경 이미지 (선택)</h2>
+    <h2 id="asset-section-h2" style="display:none;">3. 에셋 (선택 캐릭터)</h2>
+    <div id="asset-library"></div>
+
+    <h2>배경 이미지 (선택)</h2>
     <div class="field">
       <input type="file" id="bg-input" accept="image/*" />
     </div>
     <button id="clear-bg" class="secondary">배경 제거</button>
 
-    <h2>3. 카메라</h2>
+    <h2>카메라</h2>
     <div class="field">
       <label class="lbl">FOV (시야각): <span id="fov-val">60</span>°</label>
       <input type="range" id="fov-slider" min="30" max="120" value="60" />
     </div>
 
-    <h2>4. 선택된 객체</h2>
+    <h2>선택된 객체</h2>
     <div id="selection-info" class="empty">탑다운에서 캐릭터/카메라를 클릭하세요.</div>
     <div class="field" id="rotation-field" style="display:none; margin-top:8px;">
       <label class="lbl">바라보는 방향 (yaw): <span id="rot-val">0</span>°</label>
@@ -277,7 +384,13 @@
 
 // ---------- DOM ----------
 const $ = (id) => document.getElementById(id);
-const charListDiv      = $('char-list');
+const charLibraryDiv   = $('char-library');     // 새 통합 라이브러리 (소설+8면시트)
+const charListDiv      = charLibraryDiv;        // 호환용 alias (기존 코드가 charListDiv 참조)
+const sceneInfoDiv     = $('scene-info');
+const loadSampleBtn    = $('load-sample-btn');
+const importJsonBtn    = $('import-json-btn');
+const assetSectionH2   = $('asset-section-h2');
+const assetLibraryDiv  = $('asset-library');
 const addCharBtn       = $('add-char-btn');
 const addCharForm      = $('add-char-form');
 const charNameInput    = $('char-name');
@@ -308,11 +421,19 @@ const loadJsonBtn      = $('load-json');
 
 // ---------- State ----------
 const state = {
-  characters: [],   // { id, name, color, sprites: HTMLImageElement[], x, z, facing }
-  camera: { x: 0, z: 5, facing: 180, fov: 60 },  // facing 180 = looking south (toward -Z, where characters are by default)
-  background: null, // { image: HTMLImageElement }
-  selected: null,   // 'camera' or character.id
-  drag: null,       // { kind, id, offsetX, offsetZ }
+  characters: [],   // 무대에 올라간 (배치된) 캐릭터들 — { id, name, color, sprites, x, z, facing, sourceCharId, appliedAssetIds }
+  camera: { x: 0, z: 5, facing: 180, fov: 60 },
+  background: null,
+  selected: null,
+  drag: null,
+
+  // ─── 신규: 통합 데이터 (씬/카탈로그) ───
+  scene: null,           // { id, title, characters_appearing: ["심청", ...] } | null
+  catalog: {
+    characters: [],      // 카탈로그의 모든 캐릭터 — { id, name, source, role, references, sprites, availableAssetIds, ... }
+    assets: [],          // 카탈로그의 모든 에셋 — { id, name, type, description, koreanSummary, referenceImages, tags }
+  },
+  selectedCharForAssets: null,  // 어떤 캐릭터의 에셋을 표시 중인지 (id)
 };
 let nextId = 1;
 
@@ -641,7 +762,9 @@ stageCanvas.addEventListener('wheel', (e) => {
 // ============================================================
 function setSelected(id) {
   state.selected = id;
+  state.selectedCharForAssets = (id !== 'camera') ? id : null;
   refreshSelectionUI();
+  renderAssetLibrary();   // 선택 캐릭터의 에셋 표시
   refresh();
 }
 
@@ -701,31 +824,296 @@ deleteSelBtn.addEventListener('click', () => {
 });
 
 // ============================================================
-// Character list UI
+// Character Library UI (catalog + on-stage)
 // ============================================================
-function refreshCharList() {
-  charListDiv.innerHTML = '';
-  if (state.characters.length === 0) {
+//   카탈로그(state.catalog.characters) = 등록된 모든 캐릭터
+//   무대(state.characters) = 카탈로그에서 체크된 캐릭터들
+//   씬 컨텍스트가 있으면 등장 캐릭터는 자동 체크 + "씬 등장" 표시.
+function refreshCharList() {  // alias 유지 — 기존 호출자 호환
+  refreshCharLibrary();
+}
+
+function refreshCharLibrary() {
+  charLibraryDiv.innerHTML = '';
+  const catalog = state.catalog.characters;
+
+  if (catalog.length === 0) {
     const d = document.createElement('div');
-    d.style.cssText = 'font-size:11px;color:var(--muted);font-style:italic;padding:6px;';
-    d.textContent = '아직 캐릭터가 없습니다.';
-    charListDiv.appendChild(d);
+    d.className = 'lib-empty';
+    d.textContent = '씬을 로드하거나 캐릭터를 수동 추가하세요.';
+    charLibraryDiv.appendChild(d);
     return;
   }
-  for (const ch of state.characters) {
-    const d = document.createElement('div');
-    d.className = 'char-item' + (state.selected === ch.id ? ' selected' : '');
-    d.innerHTML = `
-      <span class="swatch" style="background:${ch.color}"></span>
-      <span class="name">${escapeHtml(ch.name)}</span>
-      <span class="count">${ch.sprites.length}장</span>
-    `;
-    d.addEventListener('click', () => setSelected(ch.id));
-    charListDiv.appendChild(d);
+
+  // 씬 등장 / 미등장으로 분리
+  const sceneNames = new Set(state.scene?.characters_appearing || []);
+  const inScene = catalog.filter(c => sceneNames.has(c.name));
+  const offScene = catalog.filter(c => !sceneNames.has(c.name));
+
+  // 씬 등장 섹션
+  if (inScene.length > 0) {
+    const h = document.createElement('div');
+    h.className = 'lib-subheader';
+    h.textContent = `씬 등장 (${inScene.length})`;
+    charLibraryDiv.appendChild(h);
+    inScene.forEach(c => charLibraryDiv.appendChild(buildCharCard(c, true)));
+  }
+
+  // 다른 캐릭터 섹션
+  if (offScene.length > 0) {
+    const h = document.createElement('div');
+    h.className = 'lib-subheader';
+    h.textContent = inScene.length > 0 ? `다른 캐릭터 (${offScene.length})` : `등록 캐릭터 (${offScene.length})`;
+    charLibraryDiv.appendChild(h);
+    offScene.forEach(c => charLibraryDiv.appendChild(buildCharCard(c, false)));
   }
 }
 
-// Add character form
+function buildCharCard(catalogChar, isInScene) {
+  const onStage = state.characters.find(s => s.sourceCharId === catalogChar.id);
+  const card = document.createElement('div');
+  card.className = 'char-card' + (onStage ? ' selected' : '') + (isInScene ? ' in-scene' : '');
+
+  const badges = [];
+  if (catalogChar.source === 'novel' || catalogChar.bothSources) badges.push('<span class="badge novel">📚 소설</span>');
+  if (catalogChar.source === 'sheet8' || catalogChar.bothSources) badges.push('<span class="badge sheet8">🎨 8면</span>');
+  if (catalogChar.role) badges.push(`<span class="badge role">${escapeHtml(catalogChar.role)}</span>`);
+
+  card.innerHTML = `
+    <div class="checkbox">${onStage ? '✓' : ''}</div>
+    <span class="name">${escapeHtml(catalogChar.name)}</span>
+    <div class="badges">${badges.join('')}</div>
+  `;
+
+  card.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (onStage) removeCharFromStage(onStage.id);
+    else addCharToStage(catalogChar);
+  });
+  return card;
+}
+
+function addCharToStage(catalogChar) {
+  if (state.characters.find(s => s.sourceCharId === catalogChar.id)) return;
+  const id = 'c' + (nextId++);
+  let sprites = catalogChar.sprites || [];
+  if (sprites.length === 0 && catalogChar.references) {
+    const frontUrl = catalogChar.references.front;
+    if (frontUrl) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = frontUrl;
+      sprites = [img];
+    }
+  }
+  const palette = ['#a855f7', '#38bdf8', '#22c55e', '#f5c842', '#ef4444', '#ff8c42'];
+  const color = palette[state.characters.length % palette.length];
+  state.characters.push({
+    id, name: catalogChar.name, color, sprites,
+    x: state.characters.length * 0.8 - 1, z: 0, facing: 0,
+    sourceCharId: catalogChar.id,
+    appliedAssetIds: [],
+  });
+  refreshCharLibrary();
+  renderAssetLibrary();
+  refresh();
+}
+
+function removeCharFromStage(stageId) {
+  state.characters = state.characters.filter(c => c.id !== stageId);
+  if (state.selected === stageId) state.selected = null;
+  if (state.selectedCharForAssets === stageId) state.selectedCharForAssets = null;
+  refreshCharLibrary();
+  renderAssetLibrary();
+  refresh();
+}
+
+// ============================================================
+// Asset Library UI
+// ============================================================
+const ASSET_TYPE_INFO = {
+  outfit:    { emoji: '👗', label: '의상' },
+  accessory: { emoji: '💎', label: '악세사리' },
+  prop:      { emoji: '🗡', label: '소품' },
+  tool:      { emoji: '🔧', label: '도구' },
+  pose:      { emoji: '🧍', label: '포즈' },
+};
+
+function renderAssetLibrary() {
+  assetLibraryDiv.innerHTML = '';
+  let targetStageChar = null;
+  if (state.selected && state.selected !== 'camera') {
+    targetStageChar = state.characters.find(c => c.id === state.selected);
+  }
+  if (!targetStageChar) {
+    assetSectionH2.style.display = 'none';
+    return;
+  }
+  const catalogChar = state.catalog.characters.find(c => c.id === targetStageChar.sourceCharId);
+  if (!catalogChar) {
+    assetSectionH2.style.display = 'none';
+    return;
+  }
+  const availableIds = catalogChar.availableAssetIds || [];
+  assetSectionH2.style.display = 'block';
+  assetSectionH2.textContent = `3. 에셋 — ${targetStageChar.name}`;
+
+  if (availableIds.length === 0) {
+    const d = document.createElement('div');
+    d.className = 'lib-empty';
+    d.textContent = '이 캐릭터에 등록된 에셋 없음';
+    assetLibraryDiv.appendChild(d);
+    return;
+  }
+
+  for (const aid of availableIds) {
+    const asset = state.catalog.assets.find(a => a.id === aid);
+    if (!asset) continue;
+    const applied = targetStageChar.appliedAssetIds.includes(aid);
+    const typeInfo = ASSET_TYPE_INFO[asset.type] || ASSET_TYPE_INFO.outfit;
+    const card = document.createElement('div');
+    card.className = 'asset-card' + (applied ? ' applied' : '');
+    card.innerHTML = `
+      <span class="icon">${typeInfo.emoji}</span>
+      <span class="name">${escapeHtml(asset.koreanSummary || asset.name)}</span>
+      <div class="toggle"></div>
+    `;
+    card.addEventListener('click', () => {
+      const idx = targetStageChar.appliedAssetIds.indexOf(aid);
+      if (idx >= 0) targetStageChar.appliedAssetIds.splice(idx, 1);
+      else targetStageChar.appliedAssetIds.push(aid);
+      renderAssetLibrary();
+      refresh();
+    });
+    assetLibraryDiv.appendChild(card);
+  }
+}
+
+// ============================================================
+// Scene Data Loader
+// ============================================================
+function loadSceneData(data) {
+  if (!data || !data.characters) {
+    alert('잘못된 씬 데이터 — characters 필드가 필요합니다.');
+    return;
+  }
+  const catalogMap = new Map(state.catalog.characters.map(c => [c.name, c]));
+  for (const incoming of data.characters) {
+    const existing = catalogMap.get(incoming.name);
+    if (existing) {
+      if (existing.source !== incoming.source) existing.bothSources = true;
+      existing.references = existing.references || incoming.references;
+      existing.sprites = existing.sprites || incoming.sprites;
+      existing.visualId = existing.visualId || incoming.visualId;
+      existing.role = existing.role || incoming.role;
+      existing.availableAssetIds = Array.from(new Set([
+        ...(existing.availableAssetIds || []),
+        ...(incoming.availableAssetIds || []),
+      ]));
+    } else {
+      catalogMap.set(incoming.name, { ...incoming });
+    }
+  }
+  state.catalog.characters = Array.from(catalogMap.values());
+
+  const assetMap = new Map(state.catalog.assets.map(a => [a.id, a]));
+  for (const a of (data.assets || [])) {
+    assetMap.set(a.id, a);
+  }
+  state.catalog.assets = Array.from(assetMap.values());
+
+  state.scene = data.scene || null;
+
+  if (state.scene?.characters_appearing) {
+    for (const charName of state.scene.characters_appearing) {
+      const cc = state.catalog.characters.find(c => c.name === charName);
+      if (cc && !state.characters.find(s => s.sourceCharId === cc.id)) {
+        addCharToStage(cc);
+      }
+    }
+  }
+
+  refreshSceneInfo();
+  refreshCharLibrary();
+  renderAssetLibrary();
+  refresh();
+}
+
+function refreshSceneInfo() {
+  if (!state.scene) {
+    sceneInfoDiv.className = 'scene-info empty';
+    sceneInfoDiv.textContent = '씬 데이터 없음 — 위 버튼으로 로드';
+    return;
+  }
+  sceneInfoDiv.className = 'scene-info';
+  const meta = state.scene.characters_appearing
+    ? `등장 ${state.scene.characters_appearing.length}명: ${state.scene.characters_appearing.join(', ')}`
+    : '';
+  sceneInfoDiv.innerHTML = `
+    <div class="scene-title">${escapeHtml(state.scene.title || state.scene.id || '씬')}</div>
+    <div class="scene-meta">${escapeHtml(meta)}</div>
+  `;
+}
+
+function getSampleSceneData() {
+  return {
+    scene: {
+      id: 'ep1-효녀심청',
+      title: '1화 - 효녀 심청',
+      characters_appearing: ['심청', '심봉사', '뺑덕어멈'],
+    },
+    characters: [
+      { id: 'c_simchung', name: '심청', source: 'novel', role: '주인공',
+        visualId: 'A young woman with long black hair, traditional Korean look',
+        loraTrigger: '', references: null, sprites: null,
+        availableAssetIds: ['a_hanbok', 'a_apron'] },
+      { id: 'c_simbongsa', name: '심봉사', source: 'novel', role: '조연',
+        visualId: 'An elderly blind man with white hair and beard', references: null, sprites: null,
+        availableAssetIds: ['a_hanbok_male'] },
+      { id: 'c_ppaengduk', name: '뺑덕어멈', source: 'novel', role: '조연',
+        visualId: 'A middle-aged woman with sharp expression', references: null, sprites: null,
+        availableAssetIds: ['a_apron'] },
+      { id: 'c_henjel', name: '헨젤', source: 'novel', role: '주인공',
+        visualId: 'A young boy with blonde hair, fairy tale style', references: null, sprites: null,
+        availableAssetIds: [] },
+      { id: 'c_inuhgongju', name: '인어공주', source: 'sheet8', role: '주인공',
+        visualId: '', references: null, sprites: [],
+        availableAssetIds: [] },
+    ],
+    assets: [
+      { id: 'a_hanbok', name: '한복 (여)', type: 'outfit',
+        description: 'traditional Korean dress, white top with green skirt',
+        koreanSummary: '여자 한복', referenceImages: [], tags: ['traditional'] },
+      { id: 'a_apron', name: '앞치마', type: 'outfit',
+        description: 'plain cotton apron tied at the waist',
+        koreanSummary: '앞치마', referenceImages: [], tags: ['casual'] },
+      { id: 'a_hanbok_male', name: '한복 (남)', type: 'outfit',
+        description: 'traditional Korean male dress, hanbok with hat',
+        koreanSummary: '남자 한복', referenceImages: [], tags: ['traditional'] },
+    ],
+  };
+}
+
+loadSampleBtn.addEventListener('click', () => {
+  loadSceneData(getSampleSceneData());
+});
+
+importJsonBtn.addEventListener('click', () => {
+  const txt = prompt('씬 JSON을 붙여넣으세요 (또는 비워두면 localStorage "stage_scene_data" 사용):');
+  if (!txt) {
+    const ls = localStorage.getItem('stage_scene_data');
+    if (ls) {
+      try { loadSceneData(JSON.parse(ls)); }
+      catch (e) { alert('localStorage 파싱 실패: ' + e.message); }
+    } else {
+      alert('localStorage에도 씬 데이터가 없습니다.');
+    }
+    return;
+  }
+  try { loadSceneData(JSON.parse(txt)); }
+  catch (e) { alert('JSON 파싱 실패: ' + e.message); }
+});
+
 addCharBtn.addEventListener('click', () => {
   addCharForm.classList.toggle('hidden');
   charNameInput.value = '';
