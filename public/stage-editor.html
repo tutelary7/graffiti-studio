@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>Stage Editor — 무대 편집기 (프로토타입)</title>
+<style>
+  :root {
+    --bg: #0f0f14;
+    --panel: #1a1a23;
+    --panel-2: #20202c;
+    --border: #2a2a35;
+    --accent: #a855f7;
+    --accent-hover: #9333ea;
+    --text: #e5e5ec;
+    --muted: #8b8b9a;
+    --error: #ef4444;
+    --success: #22c55e;
+    --camera: #38bdf8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 11px; color: var(--muted); }
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 300px 1fr 380px;
+    overflow: hidden;
+  }
+  .panel { padding: 14px; overflow-y: auto; }
+  .panel.left  { border-right: 1px solid var(--border); }
+  .panel.right { border-left: 1px solid var(--border); }
+  .panel h2 {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 14px 0 6px;
+  }
+  .panel h2:first-child { margin-top: 0; }
+  .field { margin-bottom: 10px; }
+  label.lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  input[type="text"], input[type="file"], textarea, select {
+    width: 100%;
+    padding: 7px 9px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: inherit;
+  }
+  input[type="file"] { padding: 6px; }
+  input[type="color"] {
+    width: 36px; height: 28px; padding: 0; border: 1px solid var(--border);
+    background: var(--panel); border-radius: 4px; cursor: pointer;
+  }
+  input[type="range"] { width: 100%; }
+  textarea { resize: vertical; min-height: 80px; font-family: ui-monospace, monospace; font-size: 10px; }
+  button {
+    padding: 7px 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button.secondary:hover { background: var(--panel-2); }
+  button.danger { background: var(--error); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .row-h { display: flex; gap: 6px; align-items: center; }
+  .row-h > button { flex: 1; }
+
+  /* === Character list === */
+  #char-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .char-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .char-item.selected { border-color: var(--accent); background: var(--panel-2); }
+  .char-item .swatch { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .char-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .char-item .count { font-size: 10px; color: var(--muted); }
+
+  /* === Add character form === */
+  #add-char-form {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 8px;
+  }
+  #add-char-form.hidden { display: none; }
+  #add-char-form .field { margin-bottom: 8px; }
+  #add-char-form small { display: block; font-size: 10px; color: var(--muted); line-height: 1.4; margin-top: 4px; }
+
+  /* === Stage area === */
+  #stage-section { display: flex; flex-direction: column; padding: 14px; overflow: hidden; }
+  #stage-section .panel-h {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px;
+  }
+  #stage-section .panel-h h2 { font-size: 13px; font-weight: 600; }
+  #stage-section .panel-h .hint { font-size: 11px; color: var(--muted); }
+  #stage-canvas {
+    width: 100%; height: 100%; flex: 1;
+    background: #050508; border: 1px solid var(--border); border-radius: 6px;
+    cursor: crosshair;
+    image-rendering: pixelated;
+  }
+
+  /* === Render preview === */
+  #render-canvas {
+    width: 100%;
+    background: #050508; border: 1px solid var(--border); border-radius: 6px;
+    display: block;
+  }
+
+  /* === Selection info === */
+  #selection-info {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 12px;
+  }
+  #selection-info.empty { color: var(--muted); font-style: italic; }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
+  .info-row .label { color: var(--muted); }
+  .info-row .value { font-family: ui-monospace, monospace; }
+
+  small.note { font-size: 10px; color: var(--muted); display: block; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Stage Editor</h1>
+  <span class="sub">탑다운 무대 → 8면 시트 자동 선택 → 카메라 시점 합성 (프로토타입)</span>
+</header>
+
+<main>
+  <!-- ========== LEFT PANEL ========== -->
+  <aside class="panel left">
+    <h2>1. 캐릭터 라이브러리</h2>
+    <div id="char-list"></div>
+    <button id="add-char-btn">+ 캐릭터 추가</button>
+
+    <div id="add-char-form" class="hidden">
+      <div class="field">
+        <label class="lbl">이름</label>
+        <input type="text" id="char-name" placeholder="예: 여자" />
+      </div>
+      <div class="field">
+        <label class="lbl">표시 색상 (탑다운 마커용)</label>
+        <input type="color" id="char-color" value="#a855f7" />
+      </div>
+      <div class="field">
+        <label class="lbl">스프라이트 PNG (1장 또는 8장)</label>
+        <input type="file" id="char-sprites" accept="image/*" multiple />
+        <small>
+          1장 업로드 시: 모든 각도에 동일 그림 사용 (테스트용)<br/>
+          8장 업로드 시 순서:<br/>
+          ① 정면 → ② 좌측 전방 3/4 → ③ 좌측면 → ④ 좌측 후방 3/4<br/>
+          → ⑤ 후면 → ⑥ 우측 후방 3/4 → ⑦ 우측면 → ⑧ 우측 전방 3/4<br/>
+          (캐릭터 기준, 반시계방향)
+        </small>
+      </div>
+      <div class="row-h">
+        <button id="confirm-add-char">추가</button>
+        <button id="cancel-add-char" class="secondary">취소</button>
+      </div>
+    </div>
+
+    <h2>2. 배경 이미지 (선택)</h2>
+    <div class="field">
+      <input type="file" id="bg-input" accept="image/*" />
+    </div>
+    <button id="clear-bg" class="secondary">배경 제거</button>
+
+    <h2>3. 카메라</h2>
+    <div class="field">
+      <label class="lbl">FOV (시야각): <span id="fov-val">60</span>°</label>
+      <input type="range" id="fov-slider" min="30" max="120" value="60" />
+    </div>
+
+    <h2>4. 선택된 객체</h2>
+    <div id="selection-info" class="empty">탑다운에서 캐릭터/카메라를 클릭하세요.</div>
+    <div class="field" id="rotation-field" style="display:none; margin-top:8px;">
+      <label class="lbl">바라보는 방향 (yaw): <span id="rot-val">0</span>°</label>
+      <input type="range" id="rot-slider" min="0" max="359" value="0" />
+    </div>
+    <button id="delete-selected" class="danger" style="display:none; margin-top:6px;">선택 항목 삭제</button>
+  </aside>
+
+  <!-- ========== CENTER: STAGE ========== -->
+  <section id="stage-section">
+    <div class="panel-h">
+      <h2>탑다운 무대 (위에서 본 시점)</h2>
+      <span class="hint">🖱️ 클릭=선택 · 드래그=이동 · 그리드 = 1m</span>
+    </div>
+    <canvas id="stage-canvas"></canvas>
+  </section>
+
+  <!-- ========== RIGHT: RENDER + JSON ========== -->
+  <aside class="panel right">
+    <h2>📷 카메라 시점 (자동 합성)</h2>
+    <canvas id="render-canvas" width="640" height="360"></canvas>
+    <div class="row-h" style="margin-top: 8px;">
+      <button id="export-png">📥 PNG 저장</button>
+      <button id="refresh-render" class="secondary">🔄 새로고침</button>
+    </div>
+    <small class="note" style="margin-top: 6px;">
+      각 캐릭터마다 카메라 기준 상대 각도를 계산해서 8면 시트에서 알맞은 그림을 자동 선택.
+      거리에 따라 크기 + 앞뒤 순서 자동 처리.
+    </small>
+
+    <h2>장면 데이터 (JSON)</h2>
+    <textarea id="scene-json" rows="10" readonly></textarea>
+    <div class="row-h" style="margin-top: 6px;">
+      <button id="copy-json" class="secondary">📋 복사</button>
+      <button id="load-json" class="secondary">📂 불러오기</button>
+    </div>
+    <small class="note" style="margin-top: 4px;">
+      메타데이터만 저장됨 (스프라이트 이미지는 별도). 나중에 기존 프로젝트의 캐릭터 라이브러리와 연결 시 ID 매핑용으로 사용.
+    </small>
+  </aside>
+</main>
+
+<script>
+// ============================================================
+// Stage Editor — Top-down multi-character compositor
+//
+// 좌표 규칙 (Three.js와 호환되도록):
+//   X 축: +X = 동(E), 화면상 오른쪽
+//   Z 축: +Z = 북(N), 화면상 위쪽 (탑다운 캔버스에서)
+//   facing 각도: 0° = +Z(N), 90° = +X(E) (시계방향, 위에서 본 시점 기준)
+//
+// 8면 시트 인덱스 (캐릭터 기준, 반시계방향으로 카메라가 회전):
+//   0: 정면 (camera 앞)
+//   1: 좌측 전방 3/4 (camera at 캐릭터의 왼쪽-앞)
+//   2: 좌측면
+//   3: 좌측 후방 3/4
+//   4: 후면
+//   5: 우측 후방 3/4
+//   6: 우측면
+//   7: 우측 전방 3/4
+// ============================================================
+
+// ---------- DOM ----------
+const $ = (id) => document.getElementById(id);
+const charListDiv      = $('char-list');
+const addCharBtn       = $('add-char-btn');
+const addCharForm      = $('add-char-form');
+const charNameInput    = $('char-name');
+const charColorInput   = $('char-color');
+const charSpritesInput = $('char-sprites');
+const confirmAddBtn    = $('confirm-add-char');
+const cancelAddBtn     = $('cancel-add-char');
+const bgInput          = $('bg-input');
+const clearBgBtn       = $('clear-bg');
+const fovSlider        = $('fov-slider');
+const fovVal           = $('fov-val');
+const selectionInfo    = $('selection-info');
+const rotationField    = $('rotation-field');
+const rotSlider        = $('rot-slider');
+const rotVal           = $('rot-val');
+const deleteSelBtn     = $('delete-selected');
+
+const stageCanvas      = $('stage-canvas');
+const stageCtx         = stageCanvas.getContext('2d');
+const renderCanvas     = $('render-canvas');
+const renderCtx        = renderCanvas.getContext('2d');
+
+const exportPngBtn     = $('export-png');
+const refreshBtn       = $('refresh-render');
+const sceneJsonTA      = $('scene-json');
+const copyJsonBtn      = $('copy-json');
+const loadJsonBtn      = $('load-json');
+
+// ---------- State ----------
+const state = {
+  characters: [],   // { id, name, color, sprites: HTMLImageElement[], x, z, facing }
+  camera: { x: 0, z: 5, facing: 180, fov: 60 },  // facing 180 = looking south (toward -Z, where characters are by default)
+  background: null, // { image: HTMLImageElement }
+  selected: null,   // 'camera' or character.id
+  drag: null,       // { kind, id, offsetX, offsetZ }
+};
+let nextId = 1;
+
+// ============================================================
+// Stage canvas — top-down view
+// ============================================================
+let stageScale = 60; // pixels per world meter
+
+function resizeStageCanvas() {
+  const rect = stageCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  stageCanvas.width  = Math.max(100, rect.width * dpr);
+  stageCanvas.height = Math.max(100, rect.height * dpr);
+  stageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawStage();
+}
+new ResizeObserver(resizeStageCanvas).observe(stageCanvas);
+
+function worldToStage(x, z) {
+  const rect = stageCanvas.getBoundingClientRect();
+  return { sx: rect.width/2 + x * stageScale, sy: rect.height/2 - z * stageScale };
+}
+function stageToWorld(sx, sy) {
+  const rect = stageCanvas.getBoundingClientRect();
+  return { x: (sx - rect.width/2) / stageScale, z: -(sy - rect.height/2) / stageScale };
+}
+
+function drawStage() {
+  const rect = stageCanvas.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  stageCtx.fillStyle = '#050508';
+  stageCtx.fillRect(0, 0, w, h);
+
+  // Grid
+  stageCtx.strokeStyle = '#1a1a25';
+  stageCtx.lineWidth = 1;
+  const cx = w/2, cy = h/2;
+  for (let i = -20; i <= 20; i++) {
+    const x = cx + i * stageScale;
+    stageCtx.beginPath(); stageCtx.moveTo(x, 0); stageCtx.lineTo(x, h); stageCtx.stroke();
+    const y = cy + i * stageScale;
+    stageCtx.beginPath(); stageCtx.moveTo(0, y); stageCtx.lineTo(w, y); stageCtx.stroke();
+  }
+  // Center axes
+  stageCtx.strokeStyle = '#2a3a4a';
+  stageCtx.lineWidth = 1.5;
+  stageCtx.beginPath(); stageCtx.moveTo(cx, 0); stageCtx.lineTo(cx, h); stageCtx.stroke();
+  stageCtx.beginPath(); stageCtx.moveTo(0, cy); stageCtx.lineTo(w, cy); stageCtx.stroke();
+
+  // Compass labels (N/S/E/W)
+  stageCtx.fillStyle = '#666';
+  stageCtx.font = 'bold 11px sans-serif';
+  stageCtx.textAlign = 'center';
+  stageCtx.textBaseline = 'middle';
+  stageCtx.fillText('N', cx, 14);
+  stageCtx.fillText('S', cx, h - 14);
+  stageCtx.fillText('E', w - 14, cy);
+  stageCtx.fillText('W', 14, cy);
+
+  // Camera FOV cone
+  drawCameraOnStage();
+
+  // Characters
+  for (const ch of state.characters) drawCharOnStage(ch);
+}
+
+function drawCharOnStage(ch) {
+  const { sx, sy } = worldToStage(ch.x, ch.z);
+  const isSel = state.selected === ch.id;
+
+  // Facing arrow
+  const facingRad = ch.facing * Math.PI / 180;
+  // arrow direction in screen: +Z is up, so facing 0 → up (sy-)
+  const ax = Math.sin(facingRad) * 28;
+  const ay = -Math.cos(facingRad) * 28;
+  stageCtx.strokeStyle = ch.color;
+  stageCtx.lineWidth = 3;
+  stageCtx.beginPath(); stageCtx.moveTo(sx, sy); stageCtx.lineTo(sx + ax, sy + ay); stageCtx.stroke();
+  // Arrowhead
+  stageCtx.fillStyle = ch.color;
+  stageCtx.beginPath();
+  stageCtx.translate(sx + ax, sy + ay);
+  stageCtx.rotate(facingRad);
+  stageCtx.moveTo(0, -8);
+  stageCtx.lineTo(-5, 0);
+  stageCtx.lineTo(5, 0);
+  stageCtx.closePath();
+  stageCtx.fill();
+  stageCtx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+
+  // Body circle
+  stageCtx.fillStyle = isSel ? ch.color : ch.color + 'cc';
+  stageCtx.strokeStyle = isSel ? '#fff' : '#000';
+  stageCtx.lineWidth = isSel ? 3 : 1.5;
+  stageCtx.beginPath(); stageCtx.arc(sx, sy, 14, 0, Math.PI * 2);
+  stageCtx.fill(); stageCtx.stroke();
+
+  // Name label
+  stageCtx.fillStyle = '#fff';
+  stageCtx.font = '11px sans-serif';
+  stageCtx.textAlign = 'center';
+  stageCtx.textBaseline = 'middle';
+  stageCtx.fillText(ch.name, sx, sy);
+
+  // Selection halo
+  if (isSel) {
+    stageCtx.strokeStyle = '#fff';
+    stageCtx.lineWidth = 1;
+    stageCtx.setLineDash([3, 3]);
+    stageCtx.beginPath(); stageCtx.arc(sx, sy, 22, 0, Math.PI * 2); stageCtx.stroke();
+    stageCtx.setLineDash([]);
+  }
+}
+
+function drawCameraOnStage() {
+  const { sx, sy } = worldToStage(state.camera.x, state.camera.z);
+  const isSel = state.selected === 'camera';
+  const facingRad = state.camera.facing * Math.PI / 180;
+  const fovRad = state.camera.fov * Math.PI / 180;
+
+  // FOV cone (transparent)
+  const coneLen = 7 * stageScale;
+  stageCtx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+  stageCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+  stageCtx.lineWidth = 1;
+  stageCtx.beginPath();
+  stageCtx.moveTo(sx, sy);
+  for (let i = 0; i <= 12; i++) {
+    const a = facingRad - fovRad/2 + (fovRad * i / 12);
+    stageCtx.lineTo(sx + Math.sin(a) * coneLen, sy - Math.cos(a) * coneLen);
+  }
+  stageCtx.closePath();
+  stageCtx.fill();
+  stageCtx.stroke();
+
+  // Camera body (triangle)
+  stageCtx.fillStyle = isSel ? '#38bdf8' : '#0ea5e9';
+  stageCtx.strokeStyle = isSel ? '#fff' : '#000';
+  stageCtx.lineWidth = isSel ? 3 : 1.5;
+  stageCtx.save();
+  stageCtx.translate(sx, sy);
+  stageCtx.rotate(facingRad);
+  stageCtx.beginPath();
+  stageCtx.moveTo(0, -14);  // tip (forward)
+  stageCtx.lineTo(-10, 8);
+  stageCtx.lineTo(10, 8);
+  stageCtx.closePath();
+  stageCtx.fill();
+  stageCtx.stroke();
+  stageCtx.restore();
+
+  if (isSel) {
+    stageCtx.strokeStyle = '#fff';
+    stageCtx.setLineDash([3, 3]);
+    stageCtx.beginPath(); stageCtx.arc(sx, sy, 22, 0, Math.PI * 2); stageCtx.stroke();
+    stageCtx.setLineDash([]);
+  }
+}
+
+// ============================================================
+// Render preview — camera view composite
+// ============================================================
+function pickSpriteIndex(character, camera) {
+  const n = character.sprites.length;
+  if (n <= 1) return 0;
+
+  const dx = camera.x - character.x;
+  const dz = camera.z - character.z;
+  let worldAngle = Math.atan2(dx, dz) * 180 / Math.PI;
+  let relAngle = worldAngle - character.facing;
+  relAngle = ((relAngle % 360) + 360) % 360;
+
+  // 8개일 때 표준 매핑 — 다른 개수면 균등 분할
+  return Math.round(relAngle / (360 / n)) % n;
+}
+
+function drawRender() {
+  const W = renderCanvas.width;
+  const H = renderCanvas.height;
+  renderCtx.clearRect(0, 0, W, H);
+
+  // Background
+  if (state.background?.image) {
+    renderCtx.drawImage(state.background.image, 0, 0, W, H);
+  } else {
+    const g = renderCtx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#1a2a3a');
+    g.addColorStop(0.7, '#0a1218');
+    g.addColorStop(1, '#000');
+    renderCtx.fillStyle = g;
+    renderCtx.fillRect(0, 0, W, H);
+    // Floor line
+    renderCtx.fillStyle = 'rgba(80, 100, 120, 0.3)';
+    renderCtx.fillRect(0, H * 0.7, W, H * 0.3);
+  }
+
+  // Compute distance for each character + filter to ones in view
+  const cam = state.camera;
+  const fovHalf = cam.fov / 2;
+  const visible = [];
+  for (const ch of state.characters) {
+    const dx = ch.x - cam.x;
+    const dz = ch.z - cam.z;
+    const distance = Math.sqrt(dx*dx + dz*dz);
+    if (distance < 0.1) continue;
+    let worldAngle = Math.atan2(dx, dz) * 180 / Math.PI;
+    let relAngle = worldAngle - cam.facing;
+    relAngle = ((relAngle + 540) % 360) - 180; // -180..180
+    if (Math.abs(relAngle) > fovHalf + 5) continue;
+    visible.push({ ch, distance, relAngle });
+  }
+  // Far first
+  visible.sort((a, b) => b.distance - a.distance);
+
+  for (const { ch, distance, relAngle } of visible) {
+    const sprIdx = pickSpriteIndex(ch, cam);
+    const sprite = ch.sprites[sprIdx] || ch.sprites[0];
+    if (!sprite || !sprite.complete) continue;
+
+    // Screen X
+    const screenX = W/2 + (relAngle / fovHalf) * (W/2);
+
+    // Scale by distance (assume base height ~ 1.7m at 1m distance covers most of canvas)
+    const baseHeight = H * 0.85; // height at distance=1
+    let spriteHeight = baseHeight / distance;
+    spriteHeight = Math.min(spriteHeight, H * 1.5); // clamp to avoid extreme zoom
+    const aspect = sprite.naturalWidth / sprite.naturalHeight;
+    const spriteWidth = spriteHeight * aspect;
+
+    // Y position: feet near bottom (perspective: closer characters have feet lower)
+    const horizon = H * 0.5;       // horizon line
+    const groundY = H * 0.95;      // where camera-near floor is
+    // Linear interpolation: distance=0 → groundY, distance=∞ → horizon
+    const feetY = horizon + (groundY - horizon) / Math.max(1, distance * 0.5);
+
+    const drawX = screenX - spriteWidth / 2;
+    const drawY = feetY - spriteHeight;
+    renderCtx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
+  }
+
+  // HUD
+  renderCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  renderCtx.fillRect(0, 0, W, 22);
+  renderCtx.fillStyle = '#9aa6ff';
+  renderCtx.font = '11px ui-monospace, monospace';
+  renderCtx.textAlign = 'left';
+  renderCtx.textBaseline = 'middle';
+  renderCtx.fillText(
+    `cam(${cam.x.toFixed(1)}, ${cam.z.toFixed(1)}) facing ${cam.facing.toFixed(0)}° fov ${cam.fov}° · ${visible.length}/${state.characters.length} 보임`,
+    8, 11
+  );
+}
+
+// ============================================================
+// Mouse interactions on stage canvas
+// ============================================================
+function pickAtScreen(sx, sy) {
+  // Camera first (smaller hit radius)
+  const cam = worldToStage(state.camera.x, state.camera.z);
+  if (Math.hypot(sx - cam.sx, sy - cam.sy) <= 16) {
+    return { kind: 'camera' };
+  }
+  // Characters
+  for (const ch of state.characters) {
+    const p = worldToStage(ch.x, ch.z);
+    if (Math.hypot(sx - p.sx, sy - p.sy) <= 16) {
+      return { kind: 'character', id: ch.id };
+    }
+  }
+  return null;
+}
+
+stageCanvas.addEventListener('mousedown', (e) => {
+  const rect = stageCanvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const hit = pickAtScreen(sx, sy);
+  if (!hit) {
+    setSelected(null);
+    return;
+  }
+  const w = stageToWorld(sx, sy);
+  if (hit.kind === 'camera') {
+    state.drag = { kind: 'camera', offsetX: state.camera.x - w.x, offsetZ: state.camera.z - w.z };
+    setSelected('camera');
+  } else {
+    const ch = state.characters.find(c => c.id === hit.id);
+    state.drag = { kind: 'character', id: ch.id, offsetX: ch.x - w.x, offsetZ: ch.z - w.z };
+    setSelected(ch.id);
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!state.drag) return;
+  const rect = stageCanvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const w = stageToWorld(sx, sy);
+  if (state.drag.kind === 'camera') {
+    state.camera.x = w.x + state.drag.offsetX;
+    state.camera.z = w.z + state.drag.offsetZ;
+  } else {
+    const ch = state.characters.find(c => c.id === state.drag.id);
+    if (ch) {
+      ch.x = w.x + state.drag.offsetX;
+      ch.z = w.z + state.drag.offsetZ;
+    }
+  }
+  refresh();
+});
+
+window.addEventListener('mouseup', () => {
+  state.drag = null;
+});
+
+// Wheel zoom on stage
+stageCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  stageScale = Math.max(20, Math.min(150, stageScale * factor));
+  drawStage();
+}, { passive: false });
+
+// ============================================================
+// Selection management
+// ============================================================
+function setSelected(id) {
+  state.selected = id;
+  refreshSelectionUI();
+  refresh();
+}
+
+function refreshSelectionUI() {
+  if (state.selected === null) {
+    selectionInfo.className = 'empty';
+    selectionInfo.textContent = '탑다운에서 캐릭터/카메라를 클릭하세요.';
+    rotationField.style.display = 'none';
+    deleteSelBtn.style.display = 'none';
+    return;
+  }
+  selectionInfo.className = '';
+  if (state.selected === 'camera') {
+    selectionInfo.innerHTML = `
+      <div class="info-row"><span class="label">선택</span><span class="value">📷 카메라</span></div>
+      <div class="info-row"><span class="label">위치 (x, z)</span><span class="value">${state.camera.x.toFixed(2)}, ${state.camera.z.toFixed(2)}</span></div>
+      <div class="info-row"><span class="label">방향</span><span class="value">${state.camera.facing.toFixed(0)}°</span></div>
+      <div class="info-row"><span class="label">FOV</span><span class="value">${state.camera.fov}°</span></div>
+    `;
+    rotSlider.value = state.camera.facing;
+    rotVal.textContent = state.camera.facing.toFixed(0);
+    rotationField.style.display = 'block';
+    deleteSelBtn.style.display = 'none';
+  } else {
+    const ch = state.characters.find(c => c.id === state.selected);
+    if (!ch) return;
+    selectionInfo.innerHTML = `
+      <div class="info-row"><span class="label">선택</span><span class="value">🧍 ${ch.name}</span></div>
+      <div class="info-row"><span class="label">위치 (x, z)</span><span class="value">${ch.x.toFixed(2)}, ${ch.z.toFixed(2)}</span></div>
+      <div class="info-row"><span class="label">바라보는 방향</span><span class="value">${ch.facing.toFixed(0)}°</span></div>
+      <div class="info-row"><span class="label">스프라이트 수</span><span class="value">${ch.sprites.length}</span></div>
+    `;
+    rotSlider.value = ch.facing;
+    rotVal.textContent = ch.facing.toFixed(0);
+    rotationField.style.display = 'block';
+    deleteSelBtn.style.display = 'block';
+  }
+}
+
+rotSlider.addEventListener('input', () => {
+  const v = parseInt(rotSlider.value, 10);
+  rotVal.textContent = v;
+  if (state.selected === 'camera') state.camera.facing = v;
+  else {
+    const ch = state.characters.find(c => c.id === state.selected);
+    if (ch) ch.facing = v;
+  }
+  refresh();
+});
+
+deleteSelBtn.addEventListener('click', () => {
+  if (state.selected === 'camera' || state.selected === null) return;
+  state.characters = state.characters.filter(c => c.id !== state.selected);
+  setSelected(null);
+  refreshCharList();
+  refresh();
+});
+
+// ============================================================
+// Character list UI
+// ============================================================
+function refreshCharList() {
+  charListDiv.innerHTML = '';
+  if (state.characters.length === 0) {
+    const d = document.createElement('div');
+    d.style.cssText = 'font-size:11px;color:var(--muted);font-style:italic;padding:6px;';
+    d.textContent = '아직 캐릭터가 없습니다.';
+    charListDiv.appendChild(d);
+    return;
+  }
+  for (const ch of state.characters) {
+    const d = document.createElement('div');
+    d.className = 'char-item' + (state.selected === ch.id ? ' selected' : '');
+    d.innerHTML = `
+      <span class="swatch" style="background:${ch.color}"></span>
+      <span class="name">${escapeHtml(ch.name)}</span>
+      <span class="count">${ch.sprites.length}장</span>
+    `;
+    d.addEventListener('click', () => setSelected(ch.id));
+    charListDiv.appendChild(d);
+  }
+}
+
+// Add character form
+addCharBtn.addEventListener('click', () => {
+  addCharForm.classList.toggle('hidden');
+  charNameInput.value = '';
+  charSpritesInput.value = '';
+});
+cancelAddBtn.addEventListener('click', () => addCharForm.classList.add('hidden'));
+
+confirmAddBtn.addEventListener('click', async () => {
+  const name = charNameInput.value.trim();
+  const color = charColorInput.value;
+  const files = Array.from(charSpritesInput.files || []);
+  if (!name) { alert('이름을 입력해주세요.'); return; }
+  if (files.length === 0) { alert('스프라이트 PNG를 1장 이상 업로드해주세요.'); return; }
+  if (files.length !== 1 && files.length !== 8) {
+    if (!confirm(`스프라이트 ${files.length}장 — 보통 1장 또는 8장을 권장합니다. 그래도 진행할까요?`)) return;
+  }
+
+  // Load all images
+  const sprites = await Promise.all(files.map(f => loadImageFile(f)));
+
+  const id = 'c' + (nextId++);
+  state.characters.push({
+    id, name, color, sprites,
+    x: 0, z: 0, facing: 0
+  });
+  addCharForm.classList.add('hidden');
+  refreshCharList();
+  setSelected(id);
+  refresh();
+});
+
+function loadImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload  = () => resolve(img);
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ============================================================
+// Background
+// ============================================================
+bgInput.addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const img = await loadImageFile(f);
+  state.background = { image: img };
+  refresh();
+});
+clearBgBtn.addEventListener('click', () => {
+  state.background = null;
+  bgInput.value = '';
+  refresh();
+});
+
+// ============================================================
+// FOV
+// ============================================================
+fovSlider.addEventListener('input', () => {
+  state.camera.fov = parseInt(fovSlider.value, 10);
+  fovVal.textContent = state.camera.fov;
+  refresh();
+});
+
+// ============================================================
+// Export / JSON
+// ============================================================
+exportPngBtn.addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = renderCanvas.toDataURL('image/png');
+  a.download = `stage-render-${Date.now()}.png`;
+  a.click();
+});
+
+refreshBtn.addEventListener('click', refresh);
+
+function buildSceneJson() {
+  return JSON.stringify({
+    version: 1,
+    camera: { ...state.camera },
+    characters: state.characters.map(ch => ({
+      id: ch.id,
+      name: ch.name,
+      color: ch.color,
+      x: +ch.x.toFixed(3),
+      z: +ch.z.toFixed(3),
+      facing: ch.facing,
+      sprite_count: ch.sprites.length
+      // (sprite 이미지 자체는 저장하지 않음 — 라이브러리 ID 매핑이 더 깔끔)
+    })),
+    has_background: !!state.background
+  }, null, 2);
+}
+
+copyJsonBtn.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(sceneJsonTA.value);
+  copyJsonBtn.textContent = '✓ 복사됨';
+  setTimeout(() => copyJsonBtn.textContent = '📋 복사', 1200);
+});
+
+loadJsonBtn.addEventListener('click', () => {
+  const txt = prompt('붙여넣기로 JSON을 입력하세요 (스프라이트는 별도 업로드 필요):');
+  if (!txt) return;
+  try {
+    const data = JSON.parse(txt);
+    if (data.camera) state.camera = { ...state.camera, ...data.camera };
+    if (data.characters) {
+      // 기존 캐릭터의 sprites 매핑 시도
+      const oldMap = new Map(state.characters.map(c => [c.name, c.sprites]));
+      state.characters = data.characters.map(c => ({
+        id: c.id || ('c' + (nextId++)),
+        name: c.name,
+        color: c.color || '#a855f7',
+        sprites: oldMap.get(c.name) || [],
+        x: c.x, z: c.z, facing: c.facing
+      }));
+    }
+    fovSlider.value = state.camera.fov;
+    fovVal.textContent = state.camera.fov;
+    refreshCharList();
+    setSelected(null);
+    refresh();
+  } catch (err) {
+    alert('JSON 파싱 실패: ' + err.message);
+  }
+});
+
+// ============================================================
+// Refresh — redraw everything + update JSON
+// ============================================================
+function refresh() {
+  drawStage();
+  drawRender();
+  sceneJsonTA.value = buildSceneJson();
+  refreshSelectionUI();
+}
+
+// ============================================================
+// Init
+// ============================================================
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// Initial render once layout settles
+requestAnimationFrame(() => {
+  resizeStageCanvas();
+  refreshCharList();
+  refresh();
+});
+
+</script>
+</body>
+</html>

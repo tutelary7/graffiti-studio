@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>Nano Banana 3D Viewer (Prototype)</title>
+<style>
+  :root {
+    --bg: #0f0f14;
+    --panel: #1a1a23;
+    --panel-2: #20202c;
+    --border: #2a2a35;
+    --accent: #a855f7;
+    --accent-hover: #9333ea;
+    --text: #e5e5ec;
+    --muted: #8b8b9a;
+    --error: #ef4444;
+    --success: #22c55e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 11px; color: var(--muted); }
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    overflow: hidden;
+  }
+  .panel { padding: 14px; overflow-y: auto; }
+  .panel.left { border-right: 1px solid var(--border); }
+  .panel.right { border-left: 1px solid var(--border); }
+  .panel h2 {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 14px 0 6px;
+  }
+  .panel h2:first-child { margin-top: 0; }
+  .field { margin-bottom: 10px; }
+  label.lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  input[type="password"], input[type="text"], textarea, input[type="file"] {
+    width: 100%;
+    padding: 7px 9px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: inherit;
+  }
+  input[type="file"] { padding: 6px; }
+  textarea { resize: vertical; min-height: 56px; }
+  button {
+    padding: 7px 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button.secondary:hover { background: var(--panel-2); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  #three-container { position: relative; background: #000; }
+  #three-canvas { width: 100%; height: 100%; display: block; }
+  .hud {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: #ddd;
+    pointer-events: none;
+  }
+  .hud .row { white-space: nowrap; }
+  .hud .dir { color: var(--accent); margin-top: 4px; font-size: 10px; }
+  .actions {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+  }
+  .controls-help {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .presets {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    padding: 8px;
+    border-radius: 8px;
+  }
+  .presets .label {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .presets button {
+    padding: 6px 10px;
+    font-size: 11px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-align: left;
+    min-width: 110px;
+  }
+  .presets button:hover { background: var(--accent); border-color: var(--accent); }
+  .presets .row-2 { display: flex; gap: 6px; }
+  .presets .row-2 button { min-width: 0; flex: 1; text-align: center; }
+  .preview-image, .result-image {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 11px;
+    overflow: hidden;
+  }
+  .preview-image img, .result-image img { width: 100%; display: block; }
+  .status { font-size: 11px; color: var(--muted); margin: 6px 0; min-height: 14px; }
+  .status.error { color: var(--error); }
+  .status.success { color: var(--success); }
+  .row-h { display: flex; gap: 6px; }
+  .row-h > * { flex: 1; }
+  .footer-note {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎨 Qwen 3D Viewer</h1>
+  <span class="sub">2D 이미지 → 3D 평면 → 카메라 회전 → Qwen-Image-Edit Multi-Angle LoRA 생성 (프로토타입)</span>
+</header>
+
+<main>
+  <!-- ============ LEFT PANEL: 입력 ============ -->
+  <aside class="panel left">
+    <h2>1. API 설정</h2>
+    <div class="field">
+      <label class="lbl">fal.ai API 키</label>
+      <input type="password" id="api-key" placeholder="fal-..." autocomplete="off" />
+    </div>
+    <div class="field">
+      <label class="lbl">엔드포인트 (Qwen-Image-Edit + Multi-Angle LoRA)</label>
+      <input type="text" id="model-id" value="fal-ai/qwen-image-edit-2511/lora" />
+    </div>
+
+    <h2>2. 원본 이미지</h2>
+    <div class="field">
+      <input type="file" id="image-input" accept="image/*" />
+    </div>
+    <div class="preview-image" id="preview">원본 이미지를 업로드하세요</div>
+
+    <h2>3. 추가 지시 (선택)</h2>
+    <div class="field">
+      <textarea id="extra-prompt" rows="3" placeholder="예: 슬픈 표정, 역광, 비 오는 거리..."></textarea>
+    </div>
+
+    <h2>4. Qwen 옵션</h2>
+    <div class="field">
+      <label class="lbl">Inference Steps: <span id="steps-val">25</span></label>
+      <input type="range" id="steps-slider" min="4" max="40" value="25" style="width: 100%;" />
+      <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">낮을수록 빠름(4~10), 높을수록 안정적(20~30)</div>
+    </div>
+    <div class="field">
+      <label class="lbl">Guidance Scale: <span id="guidance-val">4.0</span></label>
+      <input type="range" id="guidance-slider" min="1" max="10" value="4" step="0.5" style="width: 100%;" />
+    </div>
+
+    <div class="footer-note">
+      💡 fal.ai API 키는 브라우저 localStorage에만 저장돼요.<br/>
+      모델: Qwen-Image-Edit-2511 + Multiple-Angles-LoRA<br/>
+      비용: 약 ₩65/회 (fal.ai 기준)
+    </div>
+  </aside>
+
+  <!-- ============ CENTER: 3D 뷰 ============ -->
+  <section id="three-container">
+    <canvas id="three-canvas"></canvas>
+    <div class="controls-help">
+      🖱️ 드래그=회전 · 우클릭=이동 · 휠=줌
+    </div>
+    <div class="presets">
+      <div class="label">프리셋 각도</div>
+      <button data-preset="front" title="정면 (N / +Z) — 캐릭터의 얼굴">⬛ 정면 (N)</button>
+      <div class="row-2">
+        <button data-preset="left"  title="캐릭터의 좌측면 (E / +X)">◀ 좌측면 (E)</button>
+        <button data-preset="right" title="캐릭터의 우측면 (W / -X)">우측면 (W) ▶</button>
+      </div>
+      <button data-preset="back" title="후면 (S / -Z) — 캐릭터의 등">⬛ 후면 (S)</button>
+      <button data-preset="top"    title="탑뷰 (↑ / +Y) — 위에서 내려다 봄">▲ 탑뷰 (↑)</button>
+      <button data-preset="bottom" title="바텀뷰 (↓ / -Y) — 아래서 올려다 봄">▼ 바텀뷰 (↓)</button>
+    </div>
+    <div class="hud" id="hud">
+      <div class="row" id="hud-angles">yaw 0° · pitch 0° · dist 5.0</div>
+      <div class="dir" id="hud-dir">방향: 정면 (front)</div>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="reset-camera">📷 리셋</button>
+      <button id="generate-btn" disabled>✨ 이 구도로 변환</button>
+    </div>
+  </section>
+
+  <!-- ============ RIGHT PANEL: 결과 ============ -->
+  <aside class="panel right">
+    <h2>결과</h2>
+    <div class="result-image" id="result">아직 생성된 이미지가 없습니다</div>
+    <div class="status" id="status"></div>
+    <div class="row-h">
+      <button class="secondary" id="download-btn" disabled>💾 다운로드</button>
+      <button class="secondary" id="use-as-source-btn" disabled>🔄 이걸 원본으로</button>
+    </div>
+
+    <h2>프롬프트 미리보기 (실시간)</h2>
+    <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">
+      카메라를 움직일 때마다 갱신됨 — [이 구도로 변환] 누르면 이 내용 그대로 Gemini에 전송
+    </div>
+    <textarea id="last-prompt" rows="8" readonly style="font-size: 10px; color: var(--muted);"></textarea>
+  </aside>
+</main>
+
+<!-- Three.js via importmap -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================
+// SECTION A: DOM 헬퍼
+// ============================================================
+const $ = (id) => document.getElementById(id);
+const apiKeyInput   = $('api-key');
+const modelInput    = $('model-id');
+const imageInput    = $('image-input');
+const previewDiv    = $('preview');
+const extraPrompt   = $('extra-prompt');
+const hudAngles     = $('hud-angles');
+const hudDir        = $('hud-dir');
+const generateBtn   = $('generate-btn');
+const resetBtn      = $('reset-camera');
+const resultDiv     = $('result');
+const statusDiv     = $('status');
+const downloadBtn   = $('download-btn');
+const useAsSrcBtn   = $('use-as-source-btn');
+const lastPromptTA  = $('last-prompt');
+const stepsSlider   = $('steps-slider');
+const stepsVal      = $('steps-val');
+const guidanceSlider = $('guidance-slider');
+const guidanceVal   = $('guidance-val');
+
+// ============================================================
+// SECTION B: 상태
+// ============================================================
+let originalImageData = null;   // base64 (no prefix)
+let originalImageMime = null;
+let originalImageUrl  = null;
+let resultImageBase64 = null;
+
+// API 키 localStorage 복원 (fal.ai 키)
+apiKeyInput.value = localStorage.getItem('fal_api_key') || '';
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('fal_api_key', apiKeyInput.value);
+});
+modelInput.value = localStorage.getItem('qwen_endpoint') || modelInput.value;
+modelInput.addEventListener('change', () => {
+  localStorage.setItem('qwen_endpoint', modelInput.value);
+});
+
+// Qwen 옵션 슬라이더
+stepsSlider.addEventListener('input', () => { stepsVal.textContent = stepsSlider.value; });
+guidanceSlider.addEventListener('input', () => { guidanceVal.textContent = parseFloat(guidanceSlider.value).toFixed(1); });
+
+// ============================================================
+// SECTION C: Three.js 씬 셋업
+//   좌표 규칙:
+//     GRID_Y = -1.2  → 그리드(바닥) 높이
+//     PLANE_H = 2.4  → 이미지 평면 고정 높이 (캐릭터 키)
+//     이미지 평면의 바닥이 GRID_Y에 닿음 → 평면 중심 y = GRID_Y + PLANE_H/2 = 0
+//     모든 OrbitControls 타겟 y = 0 (캐릭터의 가슴/배 중심)
+// ============================================================
+const GRID_Y  = -1.2;
+const PLANE_H = 2.4;
+const TY      = 0;
+
+const canvas    = $('three-canvas');
+const container = $('three-container');
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a14);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(0, 0.4, 4.5);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, TY, 0);
+// 위/아래 회전 제한을 풀어서 그리드 아래에서 올려다 보는 구도도 가능하게
+controls.minPolarAngle = 0;
+controls.maxPolarAngle = Math.PI;
+
+// 그리드 (바닥) — 선 색상을 좀 더 밝게 해서 잘 보이게
+const grid = new THREE.GridHelper(10, 20, 0x6677aa, 0x334466);
+grid.position.y = GRID_Y;
+// 그리드를 바닥처럼 양면 모두 보이게 (아래에서 올려봐도 보이게)
+grid.material.transparent = true;
+grid.material.opacity = 0.7;
+scene.add(grid);
+
+// 좌표축 (X 빨강, Y 초록, Z 파랑) — 원점에서 약간 위로 올려서 그리드 위에 보이게
+const axes = new THREE.AxesHelper(1.0);
+axes.position.y = GRID_Y + 0.001;
+scene.add(axes);
+
+// ============================================================
+// SECTION D: 단순 스켈레톤 (사람 형태 가이드)
+// 발 바닥이 GRID_Y에 닿도록 위치 잡음 (전체 키 ≈ 2.2)
+// ============================================================
+const skeleton = new THREE.Group();
+const boneMat = new THREE.MeshBasicMaterial({ color: 0x9966cc, transparent: true, opacity: 0.4, wireframe: true });
+
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 14), boneMat);
+head.position.y = 0.95;       // 머리 꼭대기 ≈ 1.15
+skeleton.add(head);
+
+const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.8, 0.24), boneMat);
+torso.position.y = 0.3;       // 어깨 0.7 ~ 골반 -0.1
+skeleton.add(torso);
+
+const armL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 0.1), boneMat);
+armL.position.set(-0.34, 0.3, 0);
+skeleton.add(armL);
+const armR = armL.clone();
+armR.position.x = 0.34;
+skeleton.add(armR);
+
+const legL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.05, 0.14), boneMat);
+legL.position.set(-0.14, -0.65, 0);   // 발바닥 ≈ -1.18 (그리드 -1.2 거의 닿음)
+skeleton.add(legL);
+const legR = legL.clone();
+legR.position.x = 0.14;
+skeleton.add(legR);
+
+scene.add(skeleton);
+
+// ============================================================
+// SECTION D-2: 방향 라벨 (N/S/E/W/↑/↓)
+// 작은 스프라이트 텍스트로 씬에 띄움.
+//   World convention:
+//     N = +Z (캐릭터의 정면 방향)
+//     S = -Z (캐릭터의 뒷면 방향)
+//     E = +X
+//     W = -X
+//     ↑ = +Y (위)
+//     ↓ = -Y (아래)
+// 캐릭터는 항상 +Z(N)를 향하고 있다고 가정.
+//   → 카메라가 +X(E)에 있으면 캐릭터의 '좌측면'이 보이고,
+//     -X(W)에 있으면 '우측면'이 보임.
+// ============================================================
+function makeDirSprite(text, color = '#ffffff') {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const g = c.getContext('2d');
+  // 배경 살짝 (가독성)
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  g.beginPath(); g.arc(32, 32, 26, 0, Math.PI * 2); g.fill();
+  g.fillStyle = color;
+  g.font = 'bold 36px sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 32, 34);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthWrite: false, depthTest: false
+  }));
+  sprite.scale.set(0.22, 0.22, 1); // 작게
+  return sprite;
+}
+
+// N/S/E/W는 그리드 바닥에 작게 깔고, ↑/↓는 머리 위·발 아래에 작게 표시.
+// AI는 시각적 위치가 아닌 프롬프트 텍스트(Compass/Vertical)로 방향을 인식하므로
+// 라벨 위치를 어디 두든 인식엔 영향 없음 — 사용자 시인성 위주 배치.
+const DIR_R   = 1.5;
+const FLOOR_Y = GRID_Y + 0.02;     // 그리드 바로 위 (Z-fighting 방지용 살짝 띄움)
+const DIR_LABELS = [
+  { t: 'N', pos: [0,      FLOOR_Y,  DIR_R], c: '#ff8a8a', s: 0.13 }, // 정면(빨강)
+  { t: 'S', pos: [0,      FLOOR_Y, -DIR_R], c: '#9aa6ff', s: 0.13 }, // 후면(파랑)
+  { t: 'E', pos: [ DIR_R, FLOOR_Y,  0    ], c: '#ffd070', s: 0.13 }, // 동(노랑)
+  { t: 'W', pos: [-DIR_R, FLOOR_Y,  0    ], c: '#7be0a3', s: 0.13 }, // 서(초록)
+  { t: '↑', pos: [0,   1.5, 0            ], c: '#ffffff', s: 0.10 }, // 머리 위
+  { t: '↓', pos: [0,  -1.4, 0            ], c: '#aaaaaa', s: 0.10 }, // 발 아래
+];
+DIR_LABELS.forEach(l => {
+  const s = makeDirSprite(l.t, l.c);
+  s.position.set(...l.pos);
+  s.scale.set(l.s, l.s, 1);
+  scene.add(s);
+});
+
+// ============================================================
+// SECTION E: 이미지 평면 (이미지 업로드 시 동적으로 추가)
+// 같은 위치에 두 메시를 겹쳐서 앞면/뒷면을 분리:
+//   - frontMesh: side=FrontSide, 원래 색상 (밝음)
+//   - backMesh : side=BackSide,  color로 살짝 어둡게 곱하기 (그림자 효과)
+// 카메라가 뒤로 돌면 BackSide만 보이므로 사용자가 '뒷면' 임을 시각적으로 인지.
+// ============================================================
+const BACK_SHADOW_COLOR = 0x999999; // 약 60% — '조금 어둡게' (검정색 아님)
+let imagePlane = null;
+
+function setImagePlaneFromUrl(dataUrl) {
+  const loader = new THREE.TextureLoader();
+  loader.load(
+    dataUrl,
+    (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const aspect = texture.image.width / texture.image.height;
+      // 높이는 PLANE_H로 고정, 너비만 비율에 따라 결정 → 어떤 이미지든 일정한 키
+      const planeH = PLANE_H;
+      const planeW = planeH * aspect;
+
+      if (imagePlane) {
+        scene.remove(imagePlane);
+        imagePlane.traverse((obj) => {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) obj.material.dispose();
+        });
+      }
+
+      const geom = new THREE.PlaneGeometry(planeW, planeH);
+
+      // 앞면: 원래 색상
+      const frontMat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.FrontSide
+      });
+      const frontMesh = new THREE.Mesh(geom, frontMat);
+
+      // 뒷면: 같은 텍스처를 살짝 어둡게 (그림자 효과 — 뒷면 인식용)
+      const backMat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.BackSide,
+        color: BACK_SHADOW_COLOR
+      });
+      const backMesh = new THREE.Mesh(geom, backMat);
+
+      imagePlane = new THREE.Group();
+      imagePlane.add(frontMesh);
+      imagePlane.add(backMesh);
+      // 평면의 바닥이 그리드(GRID_Y)에 정확히 닿도록 배치
+      imagePlane.position.set(0, GRID_Y + planeH / 2, 0);
+      scene.add(imagePlane);
+
+      console.log('[3D Viewer] 이미지 평면 추가됨', { planeW, planeH, posY: imagePlane.position.y });
+      generateBtn.disabled = false;
+      setStatus('이미지를 불러왔습니다. 3D 뷰에서 카메라를 회전한 뒤 [이 구도로 변환]을 누르세요.', 'success');
+    },
+    undefined,
+    (err) => {
+      console.error('[3D Viewer] 텍스처 로드 실패', err);
+      setStatus('이미지를 3D로 불러오는 데 실패했습니다 (콘솔 확인).', 'error');
+    }
+  );
+}
+
+// ============================================================
+// SECTION F: 리사이즈/렌더 루프
+//   ResizeObserver로 컨테이너 크기 변화 즉시 반영 (초기 레이아웃 타이밍
+//   문제로 캔버스가 0×0으로 굳어 화면이 까매지는 현상 방지)
+// ============================================================
+function fitToContainer() {
+  const w = Math.max(1, container.clientWidth);
+  const h = Math.max(1, container.clientHeight);
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+fitToContainer();
+window.addEventListener('resize', fitToContainer);
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(fitToContainer).observe(container);
+}
+// 첫 프레임에서 한 번 더 보정 (CSS 그리드 레이아웃 완료 후)
+requestAnimationFrame(fitToContainer);
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  updateHUD();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ============================================================
+// SECTION G: 카메라 각도 계산
+// 원본 이미지가 +Z 방향을 보고 있다고 가정.
+//   yaw   0°  = 정면(카메라가 +Z쪽에서 봄)
+//   yaw  90°  = 캐릭터의 좌측면(카메라가 +X쪽)
+//   yaw -90°  = 캐릭터의 우측면
+//   yaw 180°  = 후면
+//   pitch +   = 위에서 내려다 봄
+//   pitch -   = 아래에서 올려다 봄
+// ============================================================
+function computeCameraAngles() {
+  const offset = camera.position.clone().sub(controls.target);
+  const dist   = offset.length();
+  const yaw    = Math.atan2(offset.x, offset.z) * 180 / Math.PI;
+  const pitch  = Math.asin(THREE.MathUtils.clamp(offset.y / dist, -1, 1)) * 180 / Math.PI;
+  return { yaw, pitch, dist };
+}
+
+// ════════════════════════════════════════════════════════════
+// Qwen Multi-Angle LoRA 라벨 함수들 (박지수님 본인 코드 그대로)
+// generatePoseTransferViaQwen.js 에서 검증된 함수들.
+// 프롬프트 형식: "<sks> {vertical} {horizontal} {shot size}"
+// ════════════════════════════════════════════════════════════
+
+function azimuthToLabel(az) {
+  const a = ((az % 360) + 360) % 360;
+  if (a < 22.5 || a >= 337.5) return 'front view';
+  if (a < 67.5)  return '3/4 right front view';
+  if (a < 112.5) return 'right side view';
+  if (a < 157.5) return '3/4 right back view';
+  if (a < 202.5) return 'back view';
+  if (a < 247.5) return '3/4 left back view';
+  if (a < 292.5) return 'left side view';
+  return '3/4 left front view';
+}
+
+function elevationToLabel(el) {
+  const e = Math.max(-180, Math.min(180, el));
+  if (e >= 80)  return "bird's-eye view, top-down angle";
+  if (e >= 30)  return 'high-angle shot';
+  if (e >= -15 && e <= 15) return 'eye-level shot';
+  if (e > -30)  return 'slight low-angle shot';
+  if (e > -80)  return 'low-angle shot';
+  return "worm's-eye view, extreme low-angle";
+}
+
+function distanceToLabel(d) {
+  if (d <= 0.45) return 'extreme close-up';
+  if (d <= 0.75) return 'close-up shot';
+  if (d <= 1.15) return 'medium shot';
+  if (d <= 1.6)  return 'medium wide shot';
+  if (d <= 2.2)  return 'wide shot';
+  return 'full body long shot';
+}
+
+// HUD/프롬프트 미리보기용 종합 라벨 (단순 결합)
+function anglesToDirection({ yaw, pitch, dist }) {
+  const az = azimuthToLabel(yaw);
+  const el = elevationToLabel(pitch);
+  // OrbitControls dist (~4.5 기본) → Qwen distance (~1.0 medium) 변환
+  // our 4.5 = qwen 1.5 (medium wide), our 9 = qwen 3 (full body)
+  const qwenDist = (dist || 4.5) / 3.0;
+  const sz = distanceToLabel(qwenDist);
+  return `${el} ${az} ${sz}`;
+}
+
+// 나침반 8방위 (yaw 기준)
+//   yaw   0° → N, +45° → NE, +90° → E, +135° → SE,
+//   ±180° → S, -135° → SW, -90° → W, -45° → NW
+// (COMPASS_8을 함수 내부에 둬서 TDZ 문제 회피 — animate() 첫 호출에서
+//  이 함수가 호출되는데, 그때 const 변수가 아직 초기화 안 됐으면 ReferenceError로
+//  스크립트가 거기서 멈춰버림 → 이후 이벤트 리스너(이미지 업로드 등) 등록 실패)
+function compassFromYaw(yaw) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  const norm = (yaw + 360) % 360;
+  return dirs[Math.round(norm / 45) % 8];
+}
+function verticalFromPitch(pitch) {
+  if (pitch > 60)  return 'TOP (overhead, looking straight down)';
+  if (pitch > 25)  return 'HIGH (camera above eye level, looking down)';
+  if (pitch > 10)  return 'slightly above eye level';
+  if (pitch < -60) return 'BOTTOM (worm-eye, looking straight up)';
+  if (pitch < -25) return 'LOW (camera below eye level, looking up)';
+  if (pitch < -10) return 'slightly below eye level';
+  return 'eye level';
+}
+
+function updateHUD() {
+  const a = computeCameraAngles();
+  hudAngles.textContent = `azimuth ${a.yaw.toFixed(0)}° · elevation ${a.pitch.toFixed(0)}° · dist ${a.dist.toFixed(1)}`;
+  hudDir.textContent    = anglesToDirection(a);
+
+  // 실시간 Qwen 프롬프트 미리보기 — 카메라가 움직이는 즉시 textarea 갱신
+  if (originalImageData) {
+    const direction = anglesToDirection(a);
+    const extra     = extraPrompt.value.trim();
+    lastPromptTA.value = buildPrompt(direction, a, extra);
+  }
+}
+
+// 체크박스 변경 시 프롬프트 미리보기 즉시 갱신
+// (updateHUD가 매 프레임 호출되니 사실 자동 갱신되지만,
+//  명확성을 위해 change 이벤트도 따로 잡아둠)
+
+// ============================================================
+// SECTION H: 이미지 업로드
+// ============================================================
+imageInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const dataUrl = ev.target.result;
+    originalImageMime = file.type;
+    originalImageData = dataUrl.split(',')[1];
+    originalImageUrl  = dataUrl;
+    previewDiv.innerHTML = `<img src="${dataUrl}" alt="원본" />`;
+    setImagePlaneFromUrl(dataUrl);
+  };
+  reader.readAsDataURL(file);
+});
+
+// ============================================================
+// SECTION I: 카메라 리셋 + 프리셋 각도
+// 좌표 규칙: 캐릭터(이미지 평면)는 +Z 방향을 보고 있음
+//   - 정면(+Z 방향에서 봄)         → 캐릭터 얼굴이 보임
+//   - 후면(-Z 방향에서 봄)         → 캐릭터 뒤통수
+//   - 캐릭터의 좌측면              → 카메라가 캐릭터의 왼손 방향에 있음
+//   - 캐릭터의 우측면              → 카메라가 캐릭터의 오른손 방향에 있음
+//   - 탑뷰                         → 머리 위에서 내려다 봄
+//   - 바텀뷰                       → 발 아래에서 올려다 봄
+// (Three.js 기본 +X=right, +Y=up, +Z=out of screen.
+//  +Z 방향을 보는 캐릭터는 자신의 오른팔이 -X쪽에 있고, 따라서
+//  카메라가 -X쪽에 있으면 캐릭터의 우측면이 보인다.)
+// ============================================================
+const D = 4.5;        // 기본 거리
+
+// TY는 SECTION C에서 0으로 정의됨 (캐릭터 중심 = 평면 중심)
+const PRESETS = {
+  front:  { pos: [0,    TY,  D    ], target: [0, TY, 0] },
+  back:   { pos: [0,    TY, -D    ], target: [0, TY, 0] },
+  // 캐릭터 기준 '좌측면' = 카메라가 +X(=E)쪽에서 봄
+  left:   { pos: [ D,   TY,  0.001], target: [0, TY, 0] },
+  // 캐릭터 기준 '우측면' = 카메라가 -X(=W)쪽에서 봄
+  right:  { pos: [-D,   TY,  0.001], target: [0, TY, 0] },
+  // 탑뷰: 머리 위에서 내려다 봄 — 살짝 +Z 기울여 평면 edge-on 회피
+  top:    { pos: [0,    D,   0.001], target: [0, TY, 0] },
+  // 바텀뷰: 그리드 아래에서 올려다 봄 — 만화/영화의 worm-eye 컷
+  bottom: { pos: [0,   -D,   0.001], target: [0, TY, 0] }
+};
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  camera.position.set(p.pos[0], p.pos[1], p.pos[2]);
+  controls.target.set(p.target[0], p.target[1], p.target[2]);
+  controls.update();
+}
+
+resetBtn.addEventListener('click', () => {
+  // 정면 + 약간 위에서 살짝 내려다 보는 기본 시점
+  camera.position.set(0, 0.4, D);
+  controls.target.set(0, TY, 0);
+  controls.update();
+});
+
+// 프리셋 버튼 바인딩
+document.querySelectorAll('.presets button[data-preset]').forEach((btn) => {
+  btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+});
+
+// ============================================================
+// SECTION J: 생성 버튼 → Qwen 호출 (fal.ai)
+// ============================================================
+generateBtn.addEventListener('click', async () => {
+  if (!originalImageData) return;
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) { setStatus('fal.ai API 키를 입력해주세요.', 'error'); return; }
+
+  const angles    = computeCameraAngles();
+  const direction = anglesToDirection(angles);
+  const extra     = extraPrompt.value.trim();
+  const prompt    = buildPrompt(direction, angles, extra);
+  lastPromptTA.value = prompt;
+
+  generateBtn.disabled = true;
+  setStatus('Qwen 호출 중... (큐 대기 + 생성, 보통 15~40초)', '');
+  resultDiv.innerHTML = '<div style="padding:40px;font-size:11px;color:var(--muted);">⏳ 큐에 제출 중...</div>';
+
+  try {
+    // base64 → data URI (fal.ai는 image_urls에 data URI도 받아줌)
+    const dataUri = `data:${originalImageMime || 'image/png'};base64,${originalImageData}`;
+    const numSteps = parseInt(stepsSlider.value, 10);
+    const guidance = parseFloat(guidanceSlider.value);
+
+    const result = await callQwen(
+      apiKey,
+      modelInput.value.trim(),
+      prompt,
+      dataUri,
+      {
+        numSteps,
+        guidance,
+        onProgress: (p) => {
+          const q = (p.queuePosition != null) ? `대기열 ${p.queuePosition}번` : '';
+          setStatus(`${p.status} · ${p.elapsedSec}s ${q}`, '');
+        },
+      }
+    );
+    if (result.image) {
+      resultImageBase64 = result.image;
+      resultDiv.innerHTML = `<img src="data:image/png;base64,${result.image}" alt="결과" />`;
+      downloadBtn.disabled = false;
+      useAsSrcBtn.disabled = false;
+      setStatus('생성 완료! (Qwen Multi-Angle)', 'success');
+    } else {
+      setStatus('알 수 없는 응답입니다.', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus(`오류: ${err.message}`, 'error');
+    resultDiv.innerHTML = `<div style="padding:14px;color:var(--error);font-size:11px;">${escapeHtml(err.message)}</div>`;
+  } finally {
+    generateBtn.disabled = false;
+  }
+});
+
+// ============================================================
+// SECTION K: 프롬프트 빌더
+// 핵심 원칙:
+//   1) 캐릭터의 시선/머리 방향은 월드 +Z(N)에 고정 — 카메라를 따라오지 않음
+//   2) 카메라는 관찰자, 캐릭터는 카메라의 존재를 모름 (포즈를 잡지 않음)
+//   3) 풀샷 프레이밍 유지 (원본과 같은 비율, 머리~발 모두 보임)
+//   4) 모드별 분기:
+//      - characterOnly=true : 배경 제거, 캐릭터만 (합성용 안정 모드)
+//      - characterOnly=false: 카메라가 세상 속에서 움직임 — 배경도 시점 따라 재렌더 시도
+// ============================================================
+// Qwen Multi-Angle LoRA 프롬프트 빌더 (박지수님 generatePoseTransferViaQwen.js 그대로)
+// 형식: "<sks> {vertical} {horizontal} {shot size}, [extra]"
+// <sks> 는 LoRA 학습 시 사용된 트리거 토큰 — 반드시 맨 앞에.
+function buildPrompt(_directionLabel, angles, extra) {
+  const az = azimuthToLabel(angles.yaw);
+  const el = elevationToLabel(angles.pitch);
+  // OrbitControls dist (~4.5 기본) → Qwen distance (~1.5 medium wide) 변환
+  const qwenDist = (angles.dist || 4.5) / 3.0;
+  const sz = distanceToLabel(qwenDist);
+
+  let p = `<sks> ${el} ${az} ${sz}`;
+  if (extra) p += `, ${extra}`;
+  return p;
+}
+
+// ============================================================
+// SECTION L: Qwen Multi-Angle LoRA 호출 (fal.ai 큐 API)
+// 박지수님 generatePoseTransferViaQwen.js 의 submitAndPollFal 패턴 그대로.
+//   1) POST queue.fal.run/{endpoint} → request_id, status_url, response_url 반환
+//   2) status_url 폴링 → status가 COMPLETED 될 때까지
+//   3) response_url GET → 결과 이미지 URL 추출
+//
+// 입력 이미지: data URI (base64) 직접 image_urls에 넣음 — fal.ai가 받아줌.
+// ============================================================
+const LORA_PATH = 'fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA';
+
+async function callQwen(apiKey, endpoint, prompt, imageDataUri, opts = {}) {
+  if (!apiKey) throw new Error('fal.ai API 키가 필요합니다.');
+  if (!imageDataUri) throw new Error('입력 이미지가 필요합니다.');
+
+  const numSteps = opts.numSteps || 25;
+  const guidance = opts.guidance || 4.0;
+
+  const submitUrl = `https://queue.fal.run/${endpoint}`;
+  const body = {
+    image_urls: [imageDataUri],
+    prompt,
+    loras: [{ path: LORA_PATH, scale: 1.0 }],
+    num_inference_steps: numSteps,
+    guidance_scale: guidance,
+    image_size: 'square_hd',
+    enable_safety_checker: false,
+  };
+
+  // 1) Submit
+  const submitRes = await fetch(submitUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Key ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const submitData = await submitRes.json();
+  if (!submitRes.ok) {
+    throw new Error(`fal.ai 제출 실패: ${submitData.detail || submitData.error || JSON.stringify(submitData).slice(0,300)}`);
+  }
+  const { request_id, status_url, response_url } = submitData;
+  if (!status_url || !response_url) {
+    throw new Error(`fal.ai 응답 형식 오류: ${JSON.stringify(submitData).slice(0,300)}`);
+  }
+
+  // 2) Poll status
+  const t0 = Date.now();
+  const TIMEOUT_SEC = 180;
+  let status = 'IN_QUEUE';
+  let polls = 0;
+
+  while (status !== 'COMPLETED') {
+    const elapsed = (Date.now() - t0) / 1000;
+    if (elapsed > TIMEOUT_SEC) {
+      throw new Error(`Qwen 타임아웃 (${TIMEOUT_SEC}초 초과). request_id=${request_id}`);
+    }
+    const wait = polls < 5 ? 2000 : 4000;
+    await new Promise(r => setTimeout(r, wait));
+    polls++;
+
+    let statusRes;
+    try {
+      statusRes = await fetch(status_url, {
+        headers: { 'Authorization': `Key ${apiKey}` },
+      });
+    } catch (e) {
+      continue;
+    }
+    if (!statusRes.ok) continue;
+    const statusData = await statusRes.json();
+    status = statusData.status;
+
+    if (opts.onProgress) {
+      opts.onProgress({
+        status,
+        elapsedSec: Math.floor(elapsed),
+        queuePosition: statusData.queue_position,
+      });
+    }
+
+    if (status === 'FAILED') {
+      throw new Error(`Qwen 생성 실패: ${JSON.stringify(statusData).slice(0,300)}`);
+    }
+  }
+
+  // 3) Fetch result
+  const resultRes = await fetch(response_url, {
+    headers: { 'Authorization': `Key ${apiKey}` },
+  });
+  if (!resultRes.ok) {
+    const errText = await resultRes.text();
+    throw new Error(`결과 조회 실패: HTTP ${resultRes.status} ${errText.slice(0,200)}`);
+  }
+  const data = await resultRes.json();
+  const outImageUrl =
+    data.images?.[0]?.url ||
+    data.image?.url ||
+    (Array.isArray(data.images) ? data.images[0] : null);
+  if (!outImageUrl) {
+    throw new Error(`Qwen 응답에 이미지 없음: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+
+  // fal.ai 결과 URL은 임시이므로, base64로 변환해서 반환
+  // (Nano Banana 호출과 인터페이스 통일)
+  const blob = await fetch(outImageUrl).then(r => r.blob());
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      resolve(dataUrl.split(',')[1]); // base64 only
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  return { image: base64, text: null, originalUrl: outImageUrl, requestId: request_id };
+}
+
+// ============================================================
+// SECTION M: 결과 처리 (다운로드 / 원본으로 사용)
+// ============================================================
+downloadBtn.addEventListener('click', () => {
+  if (!resultImageBase64) return;
+  const a = document.createElement('a');
+  a.href = `data:image/png;base64,${resultImageBase64}`;
+  a.download = `nano-banana-${Date.now()}.png`;
+  a.click();
+});
+
+useAsSrcBtn.addEventListener('click', () => {
+  if (!resultImageBase64) return;
+  const dataUrl = `data:image/png;base64,${resultImageBase64}`;
+  originalImageMime = 'image/png';
+  originalImageData = resultImageBase64;
+  originalImageUrl  = dataUrl;
+  previewDiv.innerHTML = `<img src="${dataUrl}" alt="원본(갱신)" />`;
+  setImagePlaneFromUrl(dataUrl);
+});
+
+// ============================================================
+// SECTION N: 유틸
+// ============================================================
+function setStatus(msg, type) {
+  statusDiv.textContent = msg;
+  statusDiv.className = 'status' + (type ? ' ' + type : '');
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+</script>
+</body>
+</html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
