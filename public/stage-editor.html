@@ -204,6 +204,19 @@
   .char-card.selected .checkbox { background: var(--accent); border-color: var(--accent); }
   .char-card .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .char-card .badges { display: flex; gap: 3px; flex-shrink: 0; }
+  .char-card .qwen-btn {
+    flex-shrink: 0;
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid #6b3fa0;
+    color: #c084fc;
+    border-radius: 4px;
+    font-size: 10px;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .char-card .qwen-btn:hover { background: var(--accent); color: white; }
+  .char-card .qwen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .badge {
     font-size: 9px;
     padding: 1px 5px;
@@ -879,18 +892,59 @@ function buildCharCard(catalogChar, isInScene) {
   if (catalogChar.source === 'sheet8' || catalogChar.bothSources) badges.push('<span class="badge sheet8">🎨 8면</span>');
   if (catalogChar.role) badges.push(`<span class="badge role">${escapeHtml(catalogChar.role)}</span>`);
 
+  // Qwen 뷰어로 보낼 수 있는지 (이미지 소스가 하나라도 있으면 활성화)
+  const hasImage = !!(
+    (catalogChar.references && Object.values(catalogChar.references).some(Boolean)) ||
+    (catalogChar.sprites && Object.values(catalogChar.sprites).some(Boolean))
+  );
+
   card.innerHTML = `
     <div class="checkbox">${onStage ? '✓' : ''}</div>
     <span class="name">${escapeHtml(catalogChar.name)}</span>
     <div class="badges">${badges.join('')}</div>
+    <button class="qwen-btn" title="Qwen 3D 뷰어로 열기" ${hasImage ? '' : 'disabled'}>🎬 Qwen</button>
   `;
 
+  // 카드 본체 클릭 → 무대 추가/제거
   card.addEventListener('click', (e) => {
+    if (e.target.closest('.qwen-btn')) return; // 버튼 클릭은 별도 처리
     e.stopPropagation();
     if (onStage) removeCharFromStage(onStage.id);
     else addCharToStage(catalogChar);
   });
+
+  // Qwen 버튼 → 새 탭에서 Qwen Viewer 열기
+  const qwenBtn = card.querySelector('.qwen-btn');
+  qwenBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (qwenBtn.disabled) return;
+    openInQwenViewer(catalogChar);
+  });
+
   return card;
+}
+
+// 현재 씬 + 포커스할 캐릭터 ID를 localStorage에 저장하고 Qwen Viewer 새 탭 열기
+function openInQwenViewer(catalogChar) {
+  if (!state.scene && (!state.catalog.characters || state.catalog.characters.length === 0)) {
+    alert('먼저 씬을 로드하거나 샘플 씬을 불러와주세요.');
+    return;
+  }
+  const payload = {
+    scene: state.scene,
+    characters: state.catalog.characters,
+    assets: state.catalog.assets || [],
+  };
+  try {
+    localStorage.setItem('stage_scene_data', JSON.stringify(payload));
+    localStorage.setItem('qwen_focus_char_id', catalogChar.id);
+    const url = (location.protocol === 'http:' || location.protocol === 'https:')
+      ? './qwen-viewer.html'
+      : 'qwen-viewer.html';
+    window.open(url, '_blank');
+  } catch (err) {
+    alert('Qwen Viewer 열기 실패: ' + err.message);
+  }
 }
 
 function addCharToStage(catalogChar) {
@@ -898,7 +952,9 @@ function addCharToStage(catalogChar) {
   const id = 'c' + (nextId++);
   let sprites = catalogChar.sprites || [];
   if (sprites.length === 0 && catalogChar.references) {
-    const frontUrl = catalogChar.references.front;
+    // front 우선, 없으면 어떤 키든 첫 번째 가용 reference 사용 (스키마 변경 호환)
+    const refs = catalogChar.references;
+    const frontUrl = refs.front || refs.full_body || Object.values(refs).find(Boolean);
     if (frontUrl) {
       const img = new Image();
       img.crossOrigin = 'anonymous';

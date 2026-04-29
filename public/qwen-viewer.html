@@ -1097,8 +1097,10 @@ function applyCharToInput(catalogChar) {
   let imageUrl = null;
   if (catalogChar.sprites && catalogChar.sprites.front) {
     imageUrl = catalogChar.sprites.front;
-  } else if (catalogChar.references && catalogChar.references.front) {
-    imageUrl = catalogChar.references.front;
+  } else if (catalogChar.references) {
+    // front 우선, 없으면 어떤 키든 첫 번째 가용 reference 사용 (스키마 변경 호환)
+    const refs = catalogChar.references;
+    imageUrl = refs.front || refs.full_body || Object.values(refs).find(Boolean);
   }
   if (!imageUrl) {
     setStatus(`"${catalogChar.name}" 에 사용 가능한 이미지 없음 (sprites/references 둘 다 비어있음)`, 'error');
@@ -1220,10 +1222,18 @@ importJsonBtn.addEventListener('click', () => {
 (function autoLoadFromStorage() {
   const ls = localStorage.getItem('stage_scene_data') || localStorage.getItem('qwen_scene_data');
   if (ls) {
-    try { loadSceneData(JSON.parse(ls)); } catch (_) {}
+    try {
+      loadSceneData(JSON.parse(ls));
+      // 포커스 캐릭터 ID가 있으면 자동으로 입력에 적용 (Stage→Qwen 핸드오프)
+      const focusId = localStorage.getItem('qwen_focus_char_id');
+      if (focusId) {
+        const target = libraryState.catalog.characters.find(c => c.id === focusId);
+        if (target) setTimeout(() => applyCharToInput(target), 100);
+        localStorage.removeItem('qwen_focus_char_id');
+      }
+    } catch (_) {}
   }
 })();
-
 </script>
 </body>
 </html>
