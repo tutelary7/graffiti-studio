@@ -6,8 +6,10 @@ const navItems = [
   { to: '/anchor', icon: '📥', label: '앵커 설정', section: '탐색' },
   { to: '/pose', icon: '🎭', label: '포즈 편집', section: '작업 공간' },
   { to: '/stage', icon: '🎥', label: '3D 스테이지', section: '작업 공간' },
+  { to: '/scene', icon: '🎬', label: '씬 (Scene)', section: '작업 공간' },
   { to: '/sheet', icon: '📐', label: '8면 시트', section: '작업 공간' },
   { to: '/gallery', icon: '🖼️', label: '갤러리', section: '작업 공간' },
+  { to: '/assets', icon: '📁', label: '에셋 라이브러리', section: '작업 공간' },
   { to: '/export', icon: '📤', label: '내보내기', section: '마무리' },
 ]
 

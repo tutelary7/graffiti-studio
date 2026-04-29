@@ -27,6 +27,29 @@ export default function TopBar() {
         <span className="brand-tag">CHARACTER STAGE · v0.1.0</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* novel-workstation으로 가는 링크 */}
+        <a
+          href="http://localhost:5173/?screen=NOVEL_LIST"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="novel-workstation 새 탭으로 열기 (소설 본문 작성 / 캐릭터 등록 등)"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: 'var(--bg-2)', border: '1px solid var(--border)',
+            color: 'var(--text-2)', textDecoration: 'none',
+            padding: '4px 10px', borderRadius: 20, fontSize: 11,
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = 'var(--accent-purple)';
+            e.currentTarget.style.color = 'var(--text-1)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'var(--border)';
+            e.currentTarget.style.color = 'var(--text-2)';
+          }}
+        >✍️ 소설 작업 ↗</a>
+
         {/* 로그인 상태 */}
         {loading ? (
           <span style={{ fontSize: 11, color: 'var(--text-3)' }}>⏳</span>

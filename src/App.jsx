@@ -8,9 +8,11 @@ import HomePage from './pages/HomePage.jsx'
 import AnchorPage from './pages/AnchorPage.jsx'
 import PosePage from './pages/PosePage.jsx'
 import StagePage from './pages/StagePage.jsx'
+import ScenePage from './pages/ScenePage.jsx'
 import SheetPage from './pages/SheetPage.jsx'
 import GalleryPage from './pages/GalleryPage.jsx'
 import ExportPage from './pages/ExportPage.jsx'
+import AssetLibraryPage from './pages/AssetLibraryPage.jsx'
 
 export default function App() {
   return (
@@ -27,8 +29,10 @@ export default function App() {
                 <Route path="/anchor" element={<AnchorPage />} />
                 <Route path="/pose" element={<PosePage />} />
                 <Route path="/stage" element={<StagePage />} />
+                <Route path="/scene" element={<ScenePage />} />
                 <Route path="/sheet" element={<SheetPage />} />
                 <Route path="/gallery" element={<GalleryPage />} />
+                <Route path="/assets" element={<AssetLibraryPage />} />
                 <Route path="/export" element={<ExportPage />} />
               </Routes>
             </main>
