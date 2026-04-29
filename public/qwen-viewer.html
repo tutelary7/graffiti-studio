@@ -217,6 +217,62 @@
   .badge.novel  { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: #1e6e8e; }
   .badge.sheet8 { background: rgba(168, 85, 247, 0.15); color: var(--accent); border-color: #6b3fa0; }
   .badge.role   { background: rgba(245, 200, 66, 0.15); color: #f5c842; border-color: #8e6b1e; }
+  /* Library search & filters */
+  .lib-search-row { display: flex; gap: 4px; margin-bottom: 6px; }
+  .lib-search {
+    flex: 1; padding: 5px 8px; font-size: 11px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text); border-radius: 4px;
+  }
+  .lib-search:focus { outline: none; border-color: var(--accent); }
+  .lib-filter-row { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+  .lib-chip {
+    padding: 3px 8px; font-size: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 10px; cursor: pointer;
+    transition: all 0.1s;
+  }
+  .lib-chip:hover { color: var(--text); }
+  .lib-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .lib-count { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+  .lib-group { margin-bottom: 8px; }
+  .lib-group-header {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 6px; margin: 6px 0 4px;
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; cursor: pointer; user-select: none;
+    border-radius: 4px; transition: background 0.1s;
+  }
+  .lib-group-header:hover { background: var(--panel-2); color: var(--text); }
+  .lib-group-header .arrow { transition: transform 0.15s; display: inline-block; width: 10px; }
+  .lib-group.collapsed .arrow { transform: rotate(-90deg); }
+  .lib-group.collapsed .lib-group-body { display: none; }
+  .lib-group-header .count { margin-left: auto; font-weight: normal; }
+  /* Hover 미리보기 팝업 */
+  #lib-hover-preview {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    display: none;
+    max-width: 240px;
+  }
+  #lib-hover-preview img {
+    display: block;
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 4px;
+  }
+  #lib-hover-preview .ph-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 0 2px;
+  }
   /* Sprite face selector (8면 시트 캐릭터용) */
   .face-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 4px; }
   .face-picker button {
@@ -257,6 +313,14 @@
       <button id="import-json-btn" class="secondary">📂 JSON</button>
     </div>
     <div id="scene-info" class="scene-info empty">씬 데이터 없음</div>
+    <div class="lib-search-row">
+      <input type="text" id="lib-search" class="lib-search" placeholder="🔍 이름/소설명 검색..." />
+    </div>
+    <div class="lib-filter-row">
+      <button class="lib-chip" data-filter="source" data-value="novel">📚 소설</button>
+      <button class="lib-chip" data-filter="source" data-value="sheet8">🎨 8면</button>
+      <button class="lib-chip" data-filter="role" data-value="주인공">⭐ 주인공</button>
+    </div>
     <div id="char-library">
       <div class="lib-empty">씬을 로드하면 캐릭터 표시됨</div>
     </div>
@@ -1038,16 +1102,55 @@ function escapeHtml(s) {
 // ============================================================
 // SECTION O: 캐릭터/에셋 라이브러리 (씬 데이터 받기)
 // ============================================================
+// Library 검색 + 필터 state
+const libFilters = {
+  search: '',
+  sources: new Set(),  // 'novel', 'sheet8'
+  roles: new Set(),    // '주인공'
+};
+
+function passLibFilter(c) {
+  if (libFilters.search) {
+    const q = libFilters.search.toLowerCase();
+    const name = (c.name || '').toLowerCase();
+    const novel = (c.novelTitle || '').toLowerCase();
+    if (!name.includes(q) && !novel.includes(q)) return false;
+  }
+  if (libFilters.sources.size > 0 && !libFilters.sources.has(c.source)) return false;
+  if (libFilters.roles.size > 0 && !libFilters.roles.has(c.role)) return false;
+  return true;
+}
+
 function renderCharLibrary() {
   charLibraryDiv.innerHTML = '';
-  const catalog = libraryState.catalog.characters;
-  if (catalog.length === 0) {
+  const allCatalog = libraryState.catalog.characters;
+  const catalog = allCatalog.filter(passLibFilter);
+
+  if (allCatalog.length === 0) {
     const d = document.createElement('div');
     d.className = 'lib-empty';
     d.textContent = '씬을 로드하면 캐릭터 표시됨';
     charLibraryDiv.appendChild(d);
     return;
   }
+
+  // 필터로 0건일 때
+  if (catalog.length === 0) {
+    const cnt = document.createElement('div');
+    cnt.className = 'lib-count';
+    cnt.textContent = `🔍 검색/필터 결과 0건 (전체 ${allCatalog.length}명)`;
+    charLibraryDiv.appendChild(cnt);
+    return;
+  }
+
+  // 필터 활성 시 결과 개수
+  if (libFilters.search || libFilters.sources.size > 0 || libFilters.roles.size > 0) {
+    const cnt = document.createElement('div');
+    cnt.className = 'lib-count';
+    cnt.textContent = `${catalog.length}명 / 전체 ${allCatalog.length}명`;
+    charLibraryDiv.appendChild(cnt);
+  }
+
   const sceneNames = new Set(libraryState.scene?.characters_appearing || []);
   const inScene = catalog.filter(c => sceneNames.has(c.name));
   const offScene = catalog.filter(c => !sceneNames.has(c.name));
@@ -1064,7 +1167,37 @@ function renderCharLibrary() {
     h.className = 'lib-subheader';
     h.textContent = inScene.length > 0 ? `다른 캐릭터 (${offScene.length})` : `등록 캐릭터 (${offScene.length})`;
     charLibraryDiv.appendChild(h);
-    offScene.forEach(c => charLibraryDiv.appendChild(buildCharCard(c, false)));
+    renderGroupedCards(charLibraryDiv, offScene, false);
+  }
+}
+
+// 캐릭터 배열을 소설/8면 그룹으로 묶어서 렌더 (접기/펼치기)
+function renderGroupedCards(container, chars, isInScene) {
+  const groups = new Map();
+  for (const ch of chars) {
+    const key = ch.source === 'sheet8' ? '🎨 8면 시트' : (ch.novelTitle || '(소속 미지정)');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(ch);
+  }
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    if (a.startsWith('🎨')) return -1;
+    if (b.startsWith('🎨')) return 1;
+    return a.localeCompare(b, 'ko');
+  });
+  for (const key of sortedKeys) {
+    const list = groups.get(key);
+    const groupEl = document.createElement('div');
+    groupEl.className = 'lib-group';
+    const header = document.createElement('div');
+    header.className = 'lib-group-header';
+    header.innerHTML = `<span class="arrow">▼</span><span>${escapeHtml(key)}</span><span class="count">${list.length}명</span>`;
+    header.addEventListener('click', () => groupEl.classList.toggle('collapsed'));
+    const body = document.createElement('div');
+    body.className = 'lib-group-body';
+    list.forEach(ch => body.appendChild(buildCharCard(ch, isInScene)));
+    groupEl.appendChild(header);
+    groupEl.appendChild(body);
+    container.appendChild(groupEl);
   }
 }
 
@@ -1084,8 +1217,60 @@ function buildCharCard(catalogChar, isInScene) {
     <div class="badges">${badges.join('')}</div>
   `;
   card.addEventListener('click', () => applyCharToInput(catalogChar));
-  charLibraryDiv.appendChild(card);
+
+  // Hover 시 미리보기 팝업
+  card.addEventListener('mouseenter', (e) => showHoverPreview(catalogChar, e));
+  card.addEventListener('mousemove', (e) => moveHoverPreview(e));
+  card.addEventListener('mouseleave', () => hideHoverPreview());
+
   return card;
+}
+
+// === Hover 미리보기 ===
+let _hoverPreviewEl = null;
+function getHoverPreviewEl() {
+  if (!_hoverPreviewEl) {
+    _hoverPreviewEl = document.createElement('div');
+    _hoverPreviewEl.id = 'lib-hover-preview';
+    document.body.appendChild(_hoverPreviewEl);
+  }
+  return _hoverPreviewEl;
+}
+function pickPreviewUrl(ch) {
+  if (ch.sprites) {
+    const s = ch.sprites;
+    const url = s.S || s.front || Object.values(s).find(Boolean);
+    if (url) return { url, label: 's8' };
+  }
+  if (ch.references) {
+    const r = ch.references;
+    const url = r.front || r.full_body || Object.values(r).find(Boolean);
+    if (url) return { url, label: 'novel' };
+  }
+  return null;
+}
+function showHoverPreview(ch, e) {
+  const pick = pickPreviewUrl(ch);
+  if (!pick) return;
+  const el = getHoverPreviewEl();
+  el.innerHTML = `<img src="${pick.url}" alt="${escapeHtml(ch.name)}" onerror="this.style.display='none';this.parentNode.querySelector('.ph-label').textContent='이미지 로드 실패'" /><div class="ph-label">${escapeHtml(ch.name)}</div>`;
+  el.style.display = 'block';
+  moveHoverPreview(e);
+}
+function moveHoverPreview(e) {
+  if (!_hoverPreviewEl || _hoverPreviewEl.style.display === 'none') return;
+  const offsetX = 16;
+  const offsetY = 8;
+  const rect = _hoverPreviewEl.getBoundingClientRect();
+  let x = e.clientX + offsetX;
+  let y = e.clientY + offsetY;
+  if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - offsetX;
+  if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+  _hoverPreviewEl.style.left = x + 'px';
+  _hoverPreviewEl.style.top = y + 'px';
+}
+function hideHoverPreview() {
+  if (_hoverPreviewEl) _hoverPreviewEl.style.display = 'none';
 }
 
 // 캐릭터 → 입력 이미지로 로드 (Qwen Viewer는 단일 캐릭터 작업)
@@ -1216,6 +1401,25 @@ importJsonBtn.addEventListener('click', () => {
   }
   try { loadSceneData(JSON.parse(txt)); }
   catch (e) { alert('JSON 파싱 실패: ' + e.message); }
+});
+
+// 검색 input 이벤트
+document.getElementById('lib-search').addEventListener('input', (e) => {
+  libFilters.search = e.target.value.trim();
+  renderCharLibrary();
+});
+
+// 필터 칩 이벤트
+document.querySelectorAll('.lib-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    chip.classList.toggle('active');
+    const filter = chip.dataset.filter;
+    const value = chip.dataset.value;
+    const set = filter === 'source' ? libFilters.sources : libFilters.roles;
+    if (set.has(value)) set.delete(value);
+    else set.add(value);
+    renderCharLibrary();
+  });
 });
 
 // 페이지 로드 시 localStorage에 씬 데이터 있으면 자동 로드 (Stage Editor → Qwen Viewer 핸드오프용)
