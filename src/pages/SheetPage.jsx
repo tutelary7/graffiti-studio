@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useProject } from '../context/ProjectContext.jsx'
 import { generateEightViewSheet } from '../lib/ai/index.js'
 import Lightbox from '../components/Lightbox.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { buildHandoffPayload, openInStageEditor, openInQwenViewer } from '../lib/handoff/index.js'
 
 const SLOTS = [
   { key: 'front', label: '1. 정면' }, { key: 'front-right', label: '2. 우3/4' },
@@ -14,6 +16,31 @@ const SLOTS = [
 export default function SheetPage() {
   const navigate = useNavigate()
   const { currentProject, updateProject, addCut } = useProject()
+  const { user } = useAuth()
+  const [handoffBusy, setHandoffBusy] = useState(false)
+
+  async function handleOpenStageEditor() {
+    if (!user) { alert('Stage Editor를 사용하려면 먼저 로그인해주세요.'); return }
+    setHandoffBusy(true)
+    try {
+      const payload = await buildHandoffPayload({ currentProject, uid: user.uid })
+      openInStageEditor(payload)
+    } finally {
+      setHandoffBusy(false)
+    }
+  }
+
+  async function handleOpenQwenViewer() {
+    if (!user) { alert('Qwen Viewer를 사용하려면 먼저 로그인해주세요.'); return }
+    setHandoffBusy(true)
+    try {
+      const payload = await buildHandoffPayload({ currentProject, uid: user.uid })
+      const focusCharId = payload.scene?.characters_appearing?.[0] || null
+      openInQwenViewer(payload, focusCharId)
+    } finally {
+      setHandoffBusy(false)
+    }
+  }
   const [mode, setMode] = useState('auto')
   const [sheet, setSheet] = useState({})
   const [busy, setBusy] = useState(false)
@@ -85,10 +112,22 @@ export default function SheetPage() {
   const phase2 = () => alert('⚠ Phase 2에서 구현 예정')
 
   return (
-    <div>
+    <div style={{ height: '100%', overflowY: 'auto', paddingRight: 4 }}>
       <div className="screen-title">
         <h1>📐 8면 시트</h1>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-ghost"
+            onClick={handleOpenStageEditor}
+            disabled={handoffBusy}
+            title="현재 8면 시트 + 소설 캐릭터 + 에셋을 외부 Stage Editor로 보내기"
+          >🎬 Stage Editor</button>
+          <button
+            className="btn btn-ghost"
+            onClick={handleOpenQwenViewer}
+            disabled={handoffBusy}
+            title="현재 8면 시트 캐릭터를 외부 Qwen Viewer로 보내기"
+          >📐 Qwen Viewer</button>
           <button className="btn btn-ghost" onClick={phase2} title="Phase 2에서 구현 예정">📥 가져오기 (JSON)</button>
           <button className="btn btn-primary" onClick={mode === 'manual' ? handleSaveManual : phase2}>💾 시트 저장</button>
         </div>
@@ -166,7 +205,7 @@ export default function SheetPage() {
                 else if (mode === 'manual') fileRefs.current[slot.key]?.click()
               }}
               style={{
-                aspectRatio: '3/4',
+                aspectRatio: '1/1',
                 background: s ? '#0a0b10' : 'linear-gradient(160deg, var(--bg-2), var(--bg-3))',
                 border: s ? '1px solid var(--border)' : '2px dashed var(--border)',
                 borderRadius: 8, position: 'relative', display: 'flex',
@@ -187,6 +226,8 @@ export default function SheetPage() {
           )
         })}
       </div>
+
+      {handoffBusy && <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)', textAlign: 'center' }}>📡 핸드오프 데이터 수집 중...</div>}
 
       <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between' }}>
         <button className="btn btn-ghost" onClick={() => navigate('/stage')}>← 스테이지로</button>

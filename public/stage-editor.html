@@ -1329,6 +1329,15 @@ requestAnimationFrame(() => {
   refresh();
 });
 
+// 페이지 로드 시 localStorage에 씬 데이터 있으면 자동 로드 (graffiti-studio → Stage Editor 핸드오프용)
+(function autoLoadFromStorage() {
+  const ls = localStorage.getItem('stage_scene_data');
+  if (ls) {
+    try { loadSceneData(JSON.parse(ls)); }
+    catch (e) { console.error('[Stage Editor 자동 로드 실패]', e); }
+  }
+})();
+
 </script>
 </body>
 </html>
