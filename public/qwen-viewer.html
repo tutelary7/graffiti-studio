@@ -179,6 +179,51 @@
     margin-top: 10px;
     line-height: 1.5;
   }
+
+  /* === Library panels (shared with stage-editor) === */
+  .scene-info {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 11px;
+  }
+  .scene-info.empty { color: var(--muted); font-style: italic; }
+  .scene-info .scene-title { font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+  .scene-info .scene-meta { color: var(--muted); font-size: 10px; }
+  .lib-subheader {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 8px 0 4px; padding-left: 2px;
+  }
+  .lib-empty { font-size: 11px; color: var(--muted); font-style: italic; padding: 8px; text-align: center; }
+  .action-group { display: flex; gap: 4px; margin-bottom: 8px; }
+  .action-group button { flex: 1; padding: 6px 8px; font-size: 11px; }
+  .char-card {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12px; cursor: pointer; margin-bottom: 4px;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .char-card:hover { background: var(--panel-2); border-color: var(--accent); }
+  .char-card.active { border-color: var(--accent); background: rgba(168, 85, 247, 0.12); }
+  .char-card.in-scene { border-left: 3px solid var(--success); }
+  .char-card .indicator {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0;
+  }
+  .char-card.active .indicator { background: var(--accent); }
+  .char-card .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .char-card .badges { display: flex; gap: 3px; flex-shrink: 0; }
+  .badge {
+    font-size: 9px; padding: 1px 5px; border-radius: 3px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
+  }
+  .badge.novel  { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: #1e6e8e; }
+  .badge.sheet8 { background: rgba(168, 85, 247, 0.15); color: var(--accent); border-color: #6b3fa0; }
+  .badge.role   { background: rgba(245, 200, 66, 0.15); color: #f5c842; border-color: #8e6b1e; }
+  /* Sprite face selector (8면 시트 캐릭터용) */
+  .face-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 4px; }
+  .face-picker button {
+    padding: 3px 4px; font-size: 9px; background: var(--panel);
+    border: 1px solid var(--border); color: var(--muted); cursor: pointer; border-radius: 3px;
+  }
+  .face-picker button.selected { background: var(--accent); color: white; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -205,6 +250,16 @@
       <input type="file" id="image-input" accept="image/*" />
     </div>
     <div class="preview-image" id="preview">원본 이미지를 업로드하세요</div>
+
+    <h2>📚 라이브러리에서 캐릭터 선택</h2>
+    <div class="action-group">
+      <button id="load-sample-btn" class="secondary">📥 샘플 씬</button>
+      <button id="import-json-btn" class="secondary">📂 JSON</button>
+    </div>
+    <div id="scene-info" class="scene-info empty">씬 데이터 없음</div>
+    <div id="char-library">
+      <div class="lib-empty">씬을 로드하면 캐릭터 표시됨</div>
+    </div>
 
     <h2>3. 추가 지시 (선택)</h2>
     <div class="field">
@@ -310,6 +365,20 @@ const stepsSlider   = $('steps-slider');
 const stepsVal      = $('steps-val');
 const guidanceSlider = $('guidance-slider');
 const guidanceVal   = $('guidance-val');
+
+// 라이브러리 패널 DOM
+const sceneInfoDiv     = $('scene-info');
+const loadSampleBtn    = $('load-sample-btn');
+const importJsonBtn    = $('import-json-btn');
+const charLibraryDiv   = $('char-library');
+
+// 라이브러리 state
+const libraryState = {
+  scene: null,
+  catalog: { characters: [], assets: [] },
+  activeCharId: null,         // 현재 선택된 캐릭터 (입력 이미지 소스)
+  activeFace: 'front',        // 8면 시트의 어느 면 사용 중인지
+};
 
 // ============================================================
 // SECTION B: 상태
@@ -915,6 +984,7 @@ async function callQwen(apiKey, endpoint, prompt, imageDataUri, opts = {}) {
     throw new Error(`Qwen 응답에 이미지 없음: ${JSON.stringify(data).slice(0, 200)}`);
   }
 
+
   // fal.ai 결과 URL은 임시이므로, base64로 변환해서 반환
   // (Nano Banana 호출과 인터페이스 통일)
   const blob = await fetch(outImageUrl).then(r => r.blob());
@@ -964,7 +1034,196 @@ function escapeHtml(s) {
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
+
+// ============================================================
+// SECTION O: 캐릭터/에셋 라이브러리 (씬 데이터 받기)
+// ============================================================
+function renderCharLibrary() {
+  charLibraryDiv.innerHTML = '';
+  const catalog = libraryState.catalog.characters;
+  if (catalog.length === 0) {
+    const d = document.createElement('div');
+    d.className = 'lib-empty';
+    d.textContent = '씬을 로드하면 캐릭터 표시됨';
+    charLibraryDiv.appendChild(d);
+    return;
+  }
+  const sceneNames = new Set(libraryState.scene?.characters_appearing || []);
+  const inScene = catalog.filter(c => sceneNames.has(c.name));
+  const offScene = catalog.filter(c => !sceneNames.has(c.name));
+
+  if (inScene.length > 0) {
+    const h = document.createElement('div');
+    h.className = 'lib-subheader';
+    h.textContent = `씬 등장 (${inScene.length})`;
+    charLibraryDiv.appendChild(h);
+    inScene.forEach(c => charLibraryDiv.appendChild(buildCharCard(c, true)));
+  }
+  if (offScene.length > 0) {
+    const h = document.createElement('div');
+    h.className = 'lib-subheader';
+    h.textContent = inScene.length > 0 ? `다른 캐릭터 (${offScene.length})` : `등록 캐릭터 (${offScene.length})`;
+    charLibraryDiv.appendChild(h);
+    offScene.forEach(c => charLibraryDiv.appendChild(buildCharCard(c, false)));
+  }
+}
+
+function buildCharCard(catalogChar, isInScene) {
+  const isActive = libraryState.activeCharId === catalogChar.id;
+  const card = document.createElement('div');
+  card.className = 'char-card' + (isActive ? ' active' : '') + (isInScene ? ' in-scene' : '');
+
+  const badges = [];
+  if (catalogChar.source === 'novel' || catalogChar.bothSources) badges.push('<span class="badge novel">📚 소설</span>');
+  if (catalogChar.source === 'sheet8' || catalogChar.bothSources) badges.push('<span class="badge sheet8">🎨 8면</span>');
+  if (catalogChar.role) badges.push(`<span class="badge role">${escapeHtml(catalogChar.role)}</span>`);
+
+  card.innerHTML = `
+    <div class="indicator"></div>
+    <span class="name">${escapeHtml(catalogChar.name)}</span>
+    <div class="badges">${badges.join('')}</div>
+  `;
+  card.addEventListener('click', () => applyCharToInput(catalogChar));
+  charLibraryDiv.appendChild(card);
+  return card;
+}
+
+// 캐릭터 → 입력 이미지로 로드 (Qwen Viewer는 단일 캐릭터 작업)
+function applyCharToInput(catalogChar) {
+  // 어떤 이미지를 쓸지 결정:
+  //   1순위: 8면 시트 sprites[front] (있으면)
+  //   2순위: novel references.front (있으면)
+  //   3순위: 사용 불가 — 스프라이트 없는 캐릭터
+  let imageUrl = null;
+  if (catalogChar.sprites && catalogChar.sprites.front) {
+    imageUrl = catalogChar.sprites.front;
+  } else if (catalogChar.references && catalogChar.references.front) {
+    imageUrl = catalogChar.references.front;
+  }
+  if (!imageUrl) {
+    setStatus(`"${catalogChar.name}" 에 사용 가능한 이미지 없음 (sprites/references 둘 다 비어있음)`, 'error');
+    return;
+  }
+
+  // 이미지 fetch → base64 → setImagePlaneFromUrl 흐름
+  fetch(imageUrl)
+    .then(r => r.blob())
+    .then(blob => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        originalImageMime = blob.type || 'image/png';
+        originalImageData = dataUrl.split(',')[1];
+        originalImageUrl  = dataUrl;
+        previewDiv.innerHTML = `<img src="${dataUrl}" alt="${escapeHtml(catalogChar.name)}" />`;
+        setImagePlaneFromUrl(dataUrl);
+        libraryState.activeCharId = catalogChar.id;
+        renderCharLibrary();
+        setStatus(`"${catalogChar.name}" 입력 이미지로 로드 완료`, 'success');
+      };
+      reader.readAsDataURL(blob);
+    })
+    .catch(err => {
+      setStatus(`이미지 로드 실패: ${err.message}`, 'error');
+    });
+}
+
+function refreshSceneInfo() {
+  if (!libraryState.scene) {
+    sceneInfoDiv.className = 'scene-info empty';
+    sceneInfoDiv.textContent = '씬 데이터 없음';
+    return;
+  }
+  sceneInfoDiv.className = 'scene-info';
+  const meta = libraryState.scene.characters_appearing
+    ? `등장 ${libraryState.scene.characters_appearing.length}명: ${libraryState.scene.characters_appearing.join(', ')}`
+    : '';
+  sceneInfoDiv.innerHTML = `
+    <div class="scene-title">${escapeHtml(libraryState.scene.title || libraryState.scene.id || '씬')}</div>
+    <div class="scene-meta">${escapeHtml(meta)}</div>
+  `;
+}
+
+function loadSceneData(data) {
+  if (!data || !data.characters) {
+    alert('잘못된 씬 데이터 — characters 필드가 필요합니다.');
+    return;
+  }
+  const catalogMap = new Map(libraryState.catalog.characters.map(c => [c.name, c]));
+  for (const incoming of data.characters) {
+    const existing = catalogMap.get(incoming.name);
+    if (existing) {
+      if (existing.source !== incoming.source) existing.bothSources = true;
+      existing.references = existing.references || incoming.references;
+      existing.sprites = existing.sprites || incoming.sprites;
+      existing.visualId = existing.visualId || incoming.visualId;
+      existing.role = existing.role || incoming.role;
+    } else {
+      catalogMap.set(incoming.name, { ...incoming });
+    }
+  }
+  libraryState.catalog.characters = Array.from(catalogMap.values());
+
+  const assetMap = new Map(libraryState.catalog.assets.map(a => [a.id, a]));
+  for (const a of (data.assets || [])) {
+    assetMap.set(a.id, a);
+  }
+  libraryState.catalog.assets = Array.from(assetMap.values());
+  libraryState.scene = data.scene || null;
+  refreshSceneInfo();
+  renderCharLibrary();
+}
+
+function getSampleSceneData() {
+  return {
+    scene: {
+      id: 'ep1-효녀심청',
+      title: '1화 - 효녀 심청',
+      characters_appearing: ['심청', '심봉사', '뺑덕어멈'],
+    },
+    characters: [
+      { id: 'c_simchung', name: '심청', source: 'novel', role: '주인공',
+        visualId: 'A young woman with long black hair, traditional Korean look',
+        references: null, sprites: null },
+      { id: 'c_simbongsa', name: '심봉사', source: 'novel', role: '조연',
+        visualId: 'An elderly blind man', references: null, sprites: null },
+      { id: 'c_ppaengduk', name: '뺑덕어멈', source: 'novel', role: '조연',
+        visualId: 'A middle-aged woman', references: null, sprites: null },
+      { id: 'c_henjel', name: '헨젤', source: 'novel', role: '주인공',
+        visualId: 'A young boy', references: null, sprites: null },
+      { id: 'c_inuhgongju', name: '인어공주', source: 'sheet8', role: '주인공',
+        visualId: '', references: null, sprites: null },
+    ],
+    assets: [],
+  };
+}
+
+loadSampleBtn.addEventListener('click', () => loadSceneData(getSampleSceneData()));
+
+importJsonBtn.addEventListener('click', () => {
+  const txt = prompt('씬 JSON 붙여넣기 (또는 비워두면 localStorage 사용):');
+  if (!txt) {
+    const ls = localStorage.getItem('stage_scene_data') || localStorage.getItem('qwen_scene_data');
+    if (ls) {
+      try { loadSceneData(JSON.parse(ls)); }
+      catch (e) { alert('localStorage 파싱 실패: ' + e.message); }
+    } else {
+      alert('localStorage에 씬 데이터 없음.');
+    }
+    return;
+  }
+  try { loadSceneData(JSON.parse(txt)); }
+  catch (e) { alert('JSON 파싱 실패: ' + e.message); }
+});
+
+// 페이지 로드 시 localStorage에 씬 데이터 있으면 자동 로드 (Stage Editor → Qwen Viewer 핸드오프용)
+(function autoLoadFromStorage() {
+  const ls = localStorage.getItem('stage_scene_data') || localStorage.getItem('qwen_scene_data');
+  if (ls) {
+    try { loadSceneData(JSON.parse(ls)); } catch (_) {}
+  }
+})();
+
 </script>
 </body>
 </html>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
